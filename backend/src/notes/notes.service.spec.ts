@@ -52,6 +52,9 @@ describe('NotesService', () => {
         body: 'Interesting moat',
         moatPattern: 'NETWORK_EFFECTS',
         businessModel: null,
+        aiSuggestedMoatPattern: null,
+        aiSuggestedBusinessModel: null,
+        tagEditedByUser: null,
       },
     });
     expect(result.__view).toBe(true);
@@ -110,6 +113,68 @@ describe('NotesService', () => {
         body: 'New body',
         moatPattern: null,
         businessModel: null,
+      },
+    });
+  });
+
+  it('persists AI audit metadata when a suggestion accompanies the save', async () => {
+    const prisma = makePrisma();
+    const serializer = makeSerializer();
+    prisma.company.findUnique.mockResolvedValue({ id: 'c1' });
+    prisma.note.create.mockResolvedValue({ id: 'n1' });
+
+    const service = new NotesService(prisma as never, serializer as never);
+    await service.create('c1', {
+      body: 'Platform effects are strengthening',
+      moatPattern: 'NETWORK_EFFECTS',
+      businessModel: 'MARKETPLACES_AND_PLATFORMS',
+      aiAudit: {
+        suggestedMoatPattern: 'NETWORK_EFFECTS',
+        suggestedBusinessModel: 'B2B_SOFTWARE',
+      },
+    });
+
+    expect(prisma.note.create).toHaveBeenCalledWith({
+      data: {
+        companyId: 'c1',
+        body: 'Platform effects are strengthening',
+        moatPattern: 'NETWORK_EFFECTS',
+        businessModel: 'MARKETPLACES_AND_PLATFORMS',
+        aiSuggestedMoatPattern: 'NETWORK_EFFECTS',
+        aiSuggestedBusinessModel: 'B2B_SOFTWARE',
+        tagEditedByUser: true,
+      },
+    });
+  });
+
+  it('updates AI audit metadata when provided on edit', async () => {
+    const prisma = makePrisma();
+    const serializer = makeSerializer();
+    prisma.note.findUnique.mockResolvedValue({
+      id: 'n1',
+      companyId: 'c1',
+      body: 'Old',
+      moatPattern: 'BRAND',
+      businessModel: null,
+    });
+    prisma.note.update.mockResolvedValue({ id: 'n1' });
+
+    const service = new NotesService(prisma as never, serializer as never);
+    await service.update('n1', {
+      moatPattern: 'BRAND',
+      aiAudit: {
+        suggestedMoatPattern: 'NETWORK_EFFECTS',
+        suggestedBusinessModel: null,
+      },
+    });
+
+    expect(prisma.note.update).toHaveBeenCalledWith({
+      where: { id: 'n1' },
+      data: {
+        moatPattern: 'BRAND',
+        aiSuggestedMoatPattern: 'NETWORK_EFFECTS',
+        aiSuggestedBusinessModel: null,
+        tagEditedByUser: true,
       },
     });
   });

@@ -2,12 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { isTagSuggestBodyReady } from '@/lib/ai/tag-suggest.constants';
 import {
   formatNoteTimestamp,
   labelForOption,
   type NoteView,
   type TaxonomyOption,
 } from '@/types/note';
+import type { NoteAiAuditPayload, TagSuggestResponse } from '@/types/tag-suggest';
+import { isTagSuggestUnavailable } from '@/types/tag-suggest';
 
 interface CompanyNotebookProps {
   companyId: string;
@@ -60,6 +63,13 @@ export function CompanyNotebook({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestMessage, setSuggestMessage] = useState<string | null>(null);
+  const [suggestRationale, setSuggestRationale] = useState<string | null>(null);
+  const [aiPrefilled, setAiPrefilled] = useState(false);
+  const [pendingAiAudit, setPendingAiAudit] = useState<NoteAiAuditPayload | null>(
+    null,
+  );
 
   useEffect(() => {
     setNotes(initialNotes);
@@ -69,11 +79,20 @@ export function CompanyNotebook({
     () => notes.find((note) => note.id === editingNoteId) ?? null,
     [editingNoteId, notes],
   );
+  const canSuggestTags = isTagSuggestBodyReady(draft.body);
+
+  function clearSuggestionState() {
+    setSuggestMessage(null);
+    setSuggestRationale(null);
+    setAiPrefilled(false);
+    setPendingAiAudit(null);
+  }
 
   function resetForm() {
     setDraft(EMPTY_DRAFT);
     setEditingNoteId(null);
     setFormError(null);
+    clearSuggestionState();
   }
 
   function startEditing(note: NoteView) {
@@ -84,6 +103,63 @@ export function CompanyNotebook({
       businessModel: note.businessModel ?? '',
     });
     setFormError(null);
+    clearSuggestionState();
+  }
+
+  async function handleSuggestTags() {
+    if (isSuggesting || !canSuggestTags) {
+      return;
+    }
+
+    setIsSuggesting(true);
+    setSuggestMessage(null);
+    setSuggestRationale(null);
+
+    try {
+      const response = await fetch('/api/tag-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteText: draft.body }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(body?.message ?? 'Could not suggest tags');
+      }
+
+      const suggestion = (await response.json()) as TagSuggestResponse;
+      if (isTagSuggestUnavailable(suggestion)) {
+        setSuggestMessage('Suggestion unavailable — choose tags manually.');
+        setAiPrefilled(false);
+        setPendingAiAudit(null);
+        return;
+      }
+
+      setDraft((current) => ({
+        ...current,
+        moatPattern: suggestion.moatPattern ?? '',
+        businessModel: suggestion.businessModel ?? '',
+      }));
+      setPendingAiAudit({
+        suggestedMoatPattern: suggestion.moatPattern,
+        suggestedBusinessModel: suggestion.businessModel,
+      });
+      setAiPrefilled(true);
+      setSuggestRationale(suggestion.rationale ?? null);
+      setSuggestMessage('AI suggestion applied — review before saving.');
+    } catch (suggestError) {
+      setSuggestMessage(
+        suggestError instanceof Error
+          ? suggestError.message
+          : 'Suggestion unavailable — choose tags manually.',
+      );
+      setAiPrefilled(false);
+      setPendingAiAudit(null);
+    } finally {
+      setIsSuggesting(false);
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -99,6 +175,7 @@ export function CompanyNotebook({
       body: draft.body,
       moatPattern: draft.moatPattern || null,
       businessModel: draft.businessModel || null,
+      ...(pendingAiAudit ? { aiAudit: pendingAiAudit } : {}),
     };
 
     try {
@@ -136,6 +213,7 @@ export function CompanyNotebook({
             ...(payload.businessModel
               ? { businessModel: payload.businessModel }
               : {}),
+            ...(pendingAiAudit ? { aiAudit: pendingAiAudit } : {}),
           }),
         });
 
@@ -221,21 +299,41 @@ export function CompanyNotebook({
           />
         </div>
 
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSuggestTags}
+            disabled={!canSuggestTags || isSuggesting}
+            className="rounded-md border border-black/10 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/15"
+          >
+            {isSuggesting ? 'Suggesting tags…' : 'Suggest tags'}
+          </button>
+          {!canSuggestTags && draft.body.trim().length > 0 && (
+            <p className="text-muted text-xs">
+              Add a bit more detail before requesting a suggestion.
+            </p>
+          )}
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="note-moat" className="text-muted mb-1 block text-sm">
               Moat pattern (optional)
+              {aiPrefilled && (
+                <span className="text-muted ml-2 text-xs">AI pre-filled</span>
+              )}
             </label>
             <select
               id="note-moat"
               value={draft.moatPattern}
+              disabled={isSuggesting}
               onChange={(event) =>
                 setDraft((current) => ({
                   ...current,
                   moatPattern: event.target.value,
                 }))
               }
-              className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+              className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 disabled:opacity-60 dark:border-white/15 dark:focus:border-white/30"
             >
               <option value="">None</option>
               {moatPatterns.map((option) => (
@@ -252,17 +350,21 @@ export function CompanyNotebook({
               className="text-muted mb-1 block text-sm"
             >
               Business model (optional)
+              {aiPrefilled && (
+                <span className="text-muted ml-2 text-xs">AI pre-filled</span>
+              )}
             </label>
             <select
               id="note-business-model"
               value={draft.businessModel}
+              disabled={isSuggesting}
               onChange={(event) =>
                 setDraft((current) => ({
                   ...current,
                   businessModel: event.target.value,
                 }))
               }
-              className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+              className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 disabled:opacity-60 dark:border-white/15 dark:focus:border-white/30"
             >
               <option value="">None</option>
               {businessModels.map((option) => (
@@ -273,6 +375,13 @@ export function CompanyNotebook({
             </select>
           </div>
         </div>
+
+        {suggestRationale && (
+          <p className="text-muted text-xs">{suggestRationale}</p>
+        )}
+        {suggestMessage && (
+          <p className="text-muted text-sm">{suggestMessage}</p>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           <button

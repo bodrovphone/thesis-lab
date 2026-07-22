@@ -1,6 +1,15 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 import { BusinessModel, MoatPattern } from '../../generated/prisma/client';
 import { NOTE_BODY_MAX_LENGTH } from '../constants';
+import { NoteAiAuditDto } from './note-ai-audit.dto';
 
 export class CreateNoteDto {
   @IsString()
@@ -14,4 +23,9 @@ export class CreateNoteDto {
   @IsOptional()
   @IsEnum(BusinessModel)
   businessModel?: BusinessModel;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NoteAiAuditDto)
+  aiAudit?: NoteAiAuditDto;
 }

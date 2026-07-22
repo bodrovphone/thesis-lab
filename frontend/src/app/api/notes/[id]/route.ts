@@ -16,12 +16,14 @@ export async function PATCH(
     body?: unknown;
     moatPattern?: unknown;
     businessModel?: unknown;
+    aiAudit?: unknown;
   };
   try {
     payload = (await request.json()) as {
       body?: unknown;
       moatPattern?: unknown;
       businessModel?: unknown;
+      aiAudit?: unknown;
     };
   } catch {
     return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
@@ -31,6 +33,10 @@ export async function PATCH(
     body?: string;
     moatPattern?: string | null;
     businessModel?: string | null;
+    aiAudit?: {
+      suggestedMoatPattern: string | null;
+      suggestedBusinessModel: string | null;
+    };
   } = {};
 
   if (payload.body !== undefined) {
@@ -52,6 +58,30 @@ export async function PATCH(
       return NextResponse.json({ message: 'Invalid businessModel' }, { status: 400 });
     }
     input.businessModel = payload.businessModel;
+  }
+
+  if (payload.aiAudit !== undefined) {
+    if (payload.aiAudit === null || typeof payload.aiAudit !== 'object') {
+      return NextResponse.json({ message: 'Invalid aiAudit' }, { status: 400 });
+    }
+    const audit = payload.aiAudit as {
+      suggestedMoatPattern?: unknown;
+      suggestedBusinessModel?: unknown;
+    };
+    input.aiAudit = {
+      suggestedMoatPattern:
+        audit.suggestedMoatPattern === null
+          ? null
+          : typeof audit.suggestedMoatPattern === 'string'
+            ? audit.suggestedMoatPattern
+            : null,
+      suggestedBusinessModel:
+        audit.suggestedBusinessModel === null
+          ? null
+          : typeof audit.suggestedBusinessModel === 'string'
+            ? audit.suggestedBusinessModel
+            : null,
+    };
   }
 
   try {

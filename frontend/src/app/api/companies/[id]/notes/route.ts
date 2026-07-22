@@ -5,6 +5,41 @@ import {
   isForwardableBackendStatus,
 } from '@/lib/api/backend-client';
 
+function parseAiAudit(value: unknown):
+  | {
+      suggestedMoatPattern: string | null;
+      suggestedBusinessModel: string | null;
+    }
+  | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== 'object') {
+    throw new Error('Invalid aiAudit');
+  }
+
+  const audit = value as {
+    suggestedMoatPattern?: unknown;
+    suggestedBusinessModel?: unknown;
+  };
+
+  return {
+    suggestedMoatPattern:
+      audit.suggestedMoatPattern === null
+        ? null
+        : typeof audit.suggestedMoatPattern === 'string'
+          ? audit.suggestedMoatPattern
+          : null,
+    suggestedBusinessModel:
+      audit.suggestedBusinessModel === null
+        ? null
+        : typeof audit.suggestedBusinessModel === 'string'
+          ? audit.suggestedBusinessModel
+          : null,
+  };
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -14,15 +49,18 @@ export async function POST(
   let body: unknown;
   let moatPattern: unknown;
   let businessModel: unknown;
+  let aiAudit: unknown;
   try {
     const payload = (await request.json()) as {
       body?: unknown;
       moatPattern?: unknown;
       businessModel?: unknown;
+      aiAudit?: unknown;
     };
     body = payload.body;
     moatPattern = payload.moatPattern;
     businessModel = payload.businessModel;
+    aiAudit = payload.aiAudit;
   } catch {
     return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
   }
@@ -35,6 +73,10 @@ export async function POST(
     body: string;
     moatPattern?: string;
     businessModel?: string;
+    aiAudit?: {
+      suggestedMoatPattern: string | null;
+      suggestedBusinessModel: string | null;
+    };
   } = { body };
 
   if (moatPattern !== undefined && moatPattern !== null && moatPattern !== '') {
@@ -49,6 +91,12 @@ export async function POST(
       return NextResponse.json({ message: 'Invalid businessModel' }, { status: 400 });
     }
     input.businessModel = businessModel;
+  }
+
+  try {
+    input.aiAudit = parseAiAudit(aiAudit);
+  } catch {
+    return NextResponse.json({ message: 'Invalid aiAudit' }, { status: 400 });
   }
 
   try {

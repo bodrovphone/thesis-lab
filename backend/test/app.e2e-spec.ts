@@ -627,4 +627,41 @@ describe('Notes and taxonomy (e2e)', () => {
       .send({ body: 'Valid', moatPattern: 'NOT_A_MOAT' })
       .expect(400);
   });
+
+  it('persists AI audit metadata when aiAudit is supplied on create', async () => {
+    const company = await prisma.company.create({
+      data: {
+        ticker: 'NOTE1',
+        name: 'Notes Test Co',
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/companies/${company.id}/notes`)
+      .send({
+        body: 'Strong network effects on the platform',
+        moatPattern: 'NETWORK_EFFECTS',
+        businessModel: 'MARKETPLACES_AND_PLATFORMS',
+        aiAudit: {
+          suggestedMoatPattern: 'NETWORK_EFFECTS',
+          suggestedBusinessModel: 'B2B_SOFTWARE',
+        },
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      moatPattern: 'NETWORK_EFFECTS',
+      businessModel: 'MARKETPLACES_AND_PLATFORMS',
+    });
+
+    const stored = await prisma.note.findUnique({
+      where: { id: response.body.id as string },
+    });
+
+    expect(stored).toMatchObject({
+      aiSuggestedMoatPattern: 'NETWORK_EFFECTS',
+      aiSuggestedBusinessModel: 'B2B_SOFTWARE',
+      tagEditedByUser: true,
+    });
+  });
 });

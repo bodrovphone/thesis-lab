@@ -8,6 +8,7 @@ import { NOTE_BODY_MAX_LENGTH } from './constants';
 import type { CreateNoteDto } from './dto/create-note.dto';
 import type { NoteViewDto } from './dto/note-view.dto';
 import type { UpdateNoteDto } from './dto/update-note.dto';
+import { resolveNoteAiAudit } from './note-ai-audit';
 import { NoteSerializer } from './note.serializer';
 
 @Injectable()
@@ -43,12 +44,17 @@ export class NotesService {
   async create(companyId: string, dto: CreateNoteDto): Promise<NoteViewDto> {
     await this.assertCompanyExists(companyId);
 
+    const moatPattern = dto.moatPattern ?? null;
+    const businessModel = dto.businessModel ?? null;
+    const aiFields = resolveNoteAiAudit(moatPattern, businessModel, dto.aiAudit);
+
     const note = await this.prisma.note.create({
       data: {
         companyId,
         body: this.normalizeBody(dto.body),
-        moatPattern: dto.moatPattern ?? null,
-        businessModel: dto.businessModel ?? null,
+        moatPattern,
+        businessModel,
+        ...aiFields,
       },
     });
 
@@ -76,6 +82,9 @@ export class NotesService {
       body?: string;
       moatPattern?: typeof existing.moatPattern;
       businessModel?: typeof existing.businessModel;
+      aiSuggestedMoatPattern?: typeof existing.aiSuggestedMoatPattern;
+      aiSuggestedBusinessModel?: typeof existing.aiSuggestedBusinessModel;
+      tagEditedByUser?: boolean | null;
     } = {};
 
     if (dto.body !== undefined) {
@@ -86,6 +95,19 @@ export class NotesService {
     }
     if (dto.businessModel !== undefined) {
       data.businessModel = dto.businessModel;
+    }
+
+    if (dto.aiAudit !== undefined) {
+      const savedMoatPattern =
+        dto.moatPattern !== undefined ? dto.moatPattern : existing.moatPattern;
+      const savedBusinessModel =
+        dto.businessModel !== undefined
+          ? dto.businessModel
+          : existing.businessModel;
+      Object.assign(
+        data,
+        resolveNoteAiAudit(savedMoatPattern, savedBusinessModel, dto.aiAudit),
+      );
     }
 
     const note = await this.prisma.note.update({

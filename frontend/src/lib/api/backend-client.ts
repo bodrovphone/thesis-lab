@@ -130,6 +130,10 @@ export async function createNote(
     body: string;
     moatPattern?: string;
     businessModel?: string;
+    aiAudit?: {
+      suggestedMoatPattern: string | null;
+      suggestedBusinessModel: string | null;
+    };
   },
 ): Promise<NoteView> {
   const response = await backendFetch(
@@ -151,6 +155,10 @@ export async function updateNote(
     body?: string;
     moatPattern?: string | null;
     businessModel?: string | null;
+    aiAudit?: {
+      suggestedMoatPattern: string | null;
+      suggestedBusinessModel: string | null;
+    };
   },
 ): Promise<NoteView> {
   const response = await backendFetch(`/notes/${encodeURIComponent(noteId)}`, {
