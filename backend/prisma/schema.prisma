@@ -1,0 +1,109 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ConvictionLevel {
+  WATCHING
+  BUILDING_CONVICTION
+  HIGH_CONVICTION
+}
+
+enum MoatPattern {
+  SCALE_ECONOMIES
+  NETWORK_EFFECTS
+  SWITCHING_COSTS
+  COUNTER_POSITIONING
+  BRAND
+  CORNERED_RESOURCE
+  PROCESS_POWER
+}
+
+enum BusinessModel {
+  LOW_COST_OPERATOR
+  FRANCHISOR
+  B2B_MIDDLEMAN
+  SERIAL_ACQUIRER
+  MISSION_CRITICAL_PRODUCTS_SERVICES
+  VERTICALLY_INTEGRATED_RETAILER
+  AUCTIONS_AND_CLASSIFIEDS
+  B2B_SOFTWARE
+  MARKETPLACES_AND_PLATFORMS
+  OEMS_WITH_INSTALLED_BASE
+  UNIQUE_IP_OR_BRANDS
+  PHYSICAL_INFRASTRUCTURE_NETWORKS
+  INSURERS_AND_FINANCIALS
+}
+
+enum EnrichmentStatus {
+  COMPLETE
+  PARTIAL
+  FAILED
+}
+
+enum DataSource {
+  SEC_EDGAR
+  FINNHUB
+  ALPHA_VANTAGE
+}
+
+model Company {
+  id                     String            @id @default(cuid())
+  ticker                 String            @unique
+  name                   String
+  cik                    String?           @unique
+  exchange               String?
+  sector                 String?
+  industry               String?
+  description            String?
+  country                String?
+  marketCapUsd           BigInt?
+  website                String?
+  logoUrl                String?
+  convictionLevel        ConvictionLevel   @default(WATCHING)
+  sourcesUsed            DataSource[]      @default([])
+  enrichmentStatus       EnrichmentStatus  @default(PARTIAL)
+  lastEnrichedAt         DateTime?
+  currentThinkingSummary String?
+  summaryGeneratedAt     DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  notes                  Note[]
+
+  @@index([convictionLevel])
+}
+
+model Note {
+  id                       String         @id @default(cuid())
+  companyId                String
+  company                  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  body                     String
+  moatPattern              MoatPattern?
+  businessModel            BusinessModel?
+  aiSuggestedMoatPattern   MoatPattern?
+  aiSuggestedBusinessModel BusinessModel?
+  tagEditedByUser          Boolean?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([moatPattern])
+  @@index([businessModel])
+}
+
+model ExternalApiCacheEntry {
+  id        String     @id @default(cuid())
+  source    DataSource
+  cacheKey  String
+  payload   Json
+  fetchedAt DateTime   @default(now())
+  expiresAt DateTime
+
+  @@unique([source, cacheKey])
+  @@index([expiresAt])
+}

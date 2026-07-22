@@ -1,0 +1,27 @@
+{
+  "private": true,
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run start:dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend",
+    "test": "npm run test --workspace backend",
+    "test:e2e": "npm run test:e2e --workspace backend",
+    "db:generate": "npm run prisma:generate --workspace backend",
+    "db:migrate": "npm run prisma:migrate --workspace backend",
+    "db:status": "npm run prisma:status --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.3",
+    "typescript": "6.0.2"
+  },
+  "overrides": {
+    "typescript": "6.0.2"
+  }
+}
