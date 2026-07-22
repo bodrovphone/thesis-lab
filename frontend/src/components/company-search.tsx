@@ -126,7 +126,7 @@ export function CompanySearch() {
   }
 
   return (
-    <div className="w-full max-w-xl">
+    <div id="company-search" className="w-full max-w-xl">
       <label htmlFor="company-search" className="sr-only">
         Search companies
       </label>
