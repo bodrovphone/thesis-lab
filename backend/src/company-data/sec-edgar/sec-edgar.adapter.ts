@@ -187,23 +187,64 @@ export class SecEdgarAdapter implements CompanyDataAdapter {
   async search(
     query: string,
     limit: number,
-  ): Promise<CompanySearchCandidate[]> {
-    const records = await this.getTickerRecords();
-    return rankCandidates(records, query, limit).map((record) =>
-      this.toCandidate(record),
-    );
+  ): Promise<AdapterResult<CompanySearchCandidate[]>> {
+    try {
+      const records = await this.getTickerRecords();
+      const candidates = rankCandidates(records, query, limit).map((record) =>
+        this.toCandidate(record),
+      );
+      return {
+        source: this.source,
+        status: 'ok',
+        data: candidates,
+      };
+    } catch (error) {
+      return {
+        source: this.source,
+        status: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'SEC company directory is unavailable',
+      };
+    }
   }
 
-  async resolveTicker(ticker: string): Promise<CompanySearchCandidate | null> {
-    const records = await this.getTickerRecords();
-    const upperTicker = ticker.trim().toUpperCase();
-    const match = records.find((record) => record.ticker === upperTicker);
-    return match ? this.toCandidate(match) : null;
+  async resolveTicker(
+    ticker: string,
+  ): Promise<AdapterResult<CompanySearchCandidate | null>> {
+    try {
+      const records = await this.getTickerRecords();
+      const upperTicker = ticker.trim().toUpperCase();
+      const match = records.find((record) => record.ticker === upperTicker);
+      return {
+        source: this.source,
+        status: 'ok',
+        data: match ? this.toCandidate(match) : null,
+      };
+    } catch (error) {
+      return {
+        source: this.source,
+        status: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'SEC company directory is unavailable',
+      };
+    }
   }
 
   async fetchProfile(
     candidate: CompanySearchCandidate,
   ): Promise<AdapterResult<NormalizedCompanyProfile>> {
+    if (!candidate.cik) {
+      return {
+        source: this.source,
+        status: 'error',
+        message: 'SEC profile requires CIK',
+      };
+    }
+
     const url = `https://data.sec.gov/submissions/CIK${candidate.cik}.json`;
     const result = await this.scheduler.fetchJson(url, 'submissions_profile');
 
@@ -226,6 +267,10 @@ export class SecEdgarAdapter implements CompanyDataAdapter {
           cik: candidate.cik,
           exchange: candidate.exchange,
           industry: submissions.sicDescription ?? null,
+          country: null,
+          marketCapUsd: null,
+          website: null,
+          logoUrl: null,
         },
       };
     } catch {
@@ -264,7 +309,7 @@ export class SecEdgarAdapter implements CompanyDataAdapter {
       name: record.name,
       cik: record.cik,
       exchange: record.exchange,
-      source: this.source,
+      sources: ['SEC_EDGAR'],
     };
   }
 }

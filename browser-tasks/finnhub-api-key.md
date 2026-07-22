@@ -1,6 +1,8 @@
 ---
 title: Register Finnhub account and obtain API key
 created: 2026-07-23
+status: done
+completed: 2026-07-23
 ---
 
 # Register Finnhub account and obtain API key
@@ -22,3 +24,8 @@ Standalone browser task — not part of the task pipeline (see `browser-tasks/RE
 ## Notes
 - Free tier: 60 requests/minute, no credit card required.
 - No further configuration needed on Finnhub's side for this project.
+
+## Outcome
+- Finnhub account was created by the user.
+- Added `FINNHUB_API_KEY` to untracked `backend/.env`.
+- Verified the key with a live Finnhub search request for `AAPL`.

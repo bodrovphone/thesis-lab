@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { CompanyDataAggregatorService } from './company-data-aggregator.service';
 import { CompanyDataCacheService } from './cache/company-data-cache.service';
+import { FinnhubAdapter } from './finnhub/finnhub.adapter';
+import { FinnhubRequestSchedulerService } from './finnhub/finnhub-request-scheduler.service';
+import { FinnhubSearchCacheService } from './finnhub/finnhub-search-cache.service';
 import { SecEdgarAdapter } from './sec-edgar/sec-edgar.adapter';
 import { SecRequestSchedulerService } from './sec-edgar/sec-request-scheduler.service';
 
@@ -10,6 +13,9 @@ import { SecRequestSchedulerService } from './sec-edgar/sec-request-scheduler.se
     CompanyDataCacheService,
     SecEdgarAdapter,
     SecRequestSchedulerService,
+    FinnhubAdapter,
+    FinnhubRequestSchedulerService,
+    FinnhubSearchCacheService,
   ],
   exports: [CompanyDataAggregatorService],
 })

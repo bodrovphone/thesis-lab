@@ -1,5 +1,9 @@
 import Link from 'next/link';
-import type { CompanyView } from '@/types/company';
+import {
+  formatEnrichmentBadge,
+  formatMarketCapUsd,
+  type CompanyView,
+} from '@/types/company';
 
 const CONVICTION_LABELS: Record<CompanyView['convictionLevel'], string> = {
   WATCHING: 'Watching',
@@ -8,6 +12,8 @@ const CONVICTION_LABELS: Record<CompanyView['convictionLevel'], string> = {
 };
 
 export function CompanyCard({ company }: { company: CompanyView }) {
+  const marketCap = formatMarketCapUsd(company.marketCapUsd);
+
   return (
     <Link
       href={`/companies/${company.id}`}
@@ -20,13 +26,18 @@ export function CompanyCard({ company }: { company: CompanyView }) {
         )}
       </div>
       <p className="text-muted mt-1 text-sm">{company.name}</p>
+      {(company.country || marketCap) && (
+        <p className="text-muted mt-1 text-xs">
+          {[company.country, marketCap].filter(Boolean).join(' · ')}
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/15">
           {CONVICTION_LABELS[company.convictionLevel]}
         </span>
-        {company.enrichmentStatus === 'PARTIAL' && (
+        {company.enrichmentStatus !== 'COMPLETE' && (
           <span className="badge-partial rounded-full px-2 py-0.5">
-            Partial SEC profile
+            {formatEnrichmentBadge(company.enrichmentStatus)}
           </span>
         )}
       </div>

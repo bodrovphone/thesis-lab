@@ -1,7 +1,7 @@
 ---
 title: Finnhub adapter — second parallel source with merge/fallback
 domain: [backend, frontend]
-stage: ready
+stage: shipped
 created: 2026-07-22
 ---
 
@@ -543,6 +543,28 @@ None. All five specs-stage questions are resolved in this document.
 
 - [Finnhub API documentation](https://finnhub.io/docs/api)
 - [Finnhub free-plan limits](https://api.finnhub.io/pricing)
-- `03-ready/02-sec-edgar-vertical-slice.md`
+- `04-shipped/02-sec-edgar-vertical-slice.md`
 - `02-specs/mini-research-tracker-idea.md`
 - `browser-tasks/finnhub-api-key.md`
+
+## Outcome
+
+Shipped on 2026-07-23.
+
+**Built**
+
+- Optional `FINNHUB_API_KEY` in `env.validation.ts`; Finnhub disables cleanly at startup with one safe warning when absent.
+- Evolved shared adapter contracts (`sources[]`, nullable CIK, `AdapterResult` on search/resolve, `fetchProfiles` fan-out) and updated `SecEdgarAdapter` to match.
+- `FinnhubRequestSchedulerService` (40ms spacing, rolling 60s budget, 5s timeout, header auth), `FinnhubSearchCacheService` (5min TTL, LRU, in-flight coalescing), and `FinnhubAdapter` for `/search` and `/stock/profile2` with USD market-cap conversion (`× 1_000_000`).
+- `CompanyDataAggregatorService` parallel SEC+Finnhub search/resolve/profile with de-duplication, ranking, merge rules, and Finnhub-only create 503 guard.
+- Pure `mergeCompanyProfile()` with COMPLETE / PARTIAL / FAILED matrix; `CompaniesService.create` persists all merged enrichment fields.
+- Frontend search provenance badges plus richer company cards and detail (country, market cap, website, logo, source badges, enrichment status).
+
+**Verification**
+
+- `npm run lint`, `npm test` (80 unit tests), `npm run test:e2e` (11 tests with mocked SEC/Finnhub HTTP), and `npm run build` all pass from the repo root.
+- `browser-tasks/finnhub-api-key.md` completed; key stored only in untracked `backend/.env`.
+
+**Deviations**
+
+- None from the ready spec. Logo rendering uses a plain `<img>` tag rather than Next Image (cuttable per scope gate).

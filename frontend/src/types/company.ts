@@ -33,7 +33,46 @@ export interface CompanyView {
 export interface CompanySearchCandidate {
   ticker: string;
   name: string;
-  cik: string;
+  cik: string | null;
   exchange: string | null;
-  source: DataSourceName;
+  sources: DataSourceName[];
+}
+
+export function formatMarketCapUsd(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const amount = BigInt(value);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(Number(amount));
+  } catch {
+    return null;
+  }
+}
+
+export function formatSourceLabel(source: DataSourceName): string {
+  switch (source) {
+    case 'SEC_EDGAR':
+      return 'SEC';
+    case 'FINNHUB':
+      return 'Finnhub';
+    case 'ALPHA_VANTAGE':
+      return 'Alpha Vantage';
+  }
+}
+
+export function formatEnrichmentBadge(status: EnrichmentStatus): string {
+  switch (status) {
+    case 'COMPLETE':
+      return 'Complete profile';
+    case 'PARTIAL':
+      return 'Partial profile';
+    case 'FAILED':
+      return 'Profile unavailable';
+  }
 }

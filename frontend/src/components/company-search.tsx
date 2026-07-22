@@ -2,12 +2,30 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { CompanySearchCandidate } from '@/types/company';
+import {
+  formatSourceLabel,
+  type CompanySearchCandidate,
+} from '@/types/company';
 
 type SearchStatus = 'idle' | 'loading' | 'success' | 'error';
 
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
+
+function SourceBadges({ sources }: { sources: CompanySearchCandidate['sources'] }) {
+  return (
+    <span className="flex shrink-0 flex-wrap justify-end gap-1">
+      {sources.map((source) => (
+        <span
+          key={source}
+          className="rounded-full border border-black/10 px-2 py-0.5 text-xs dark:border-white/15"
+        >
+          {formatSourceLabel(source)}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export function CompanySearch() {
   const router = useRouter();
@@ -148,9 +166,12 @@ export function CompanySearch() {
                   <span className="font-medium">{candidate.ticker}</span>{' '}
                   <span className="text-muted">{candidate.name}</span>
                 </span>
-                {candidate.exchange && (
-                  <span className="text-muted text-sm">{candidate.exchange}</span>
-                )}
+                <span className="flex items-center gap-2">
+                  {candidate.exchange && (
+                    <span className="text-muted text-sm">{candidate.exchange}</span>
+                  )}
+                  <SourceBadges sources={candidate.sources} />
+                </span>
               </button>
             </li>
           ))}

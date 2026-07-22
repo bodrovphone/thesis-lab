@@ -208,15 +208,19 @@ describe('SecEdgarAdapter', () => {
 
     const results = await adapter.search('AAPL', 10);
 
-    expect(results).toEqual([
-      {
-        ticker: 'AAPL',
-        name: 'Apple Inc.',
-        cik: '0000320193',
-        exchange: 'Nasdaq',
-        source: 'SEC_EDGAR',
-      },
-    ]);
+    expect(results).toEqual({
+      source: 'SEC_EDGAR',
+      status: 'ok',
+      data: [
+        {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          cik: '0000320193',
+          exchange: 'Nasdaq',
+          sources: ['SEC_EDGAR'],
+        },
+      ],
+    });
     expect(cache.getOrRefresh).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'SEC_EDGAR',
@@ -229,10 +233,16 @@ describe('SecEdgarAdapter', () => {
   it('resolveTicker() finds an exact match only', async () => {
     const { adapter } = makeAdapter();
 
-    await expect(adapter.resolveTicker('aapl')).resolves.toEqual(
-      expect.objectContaining({ ticker: 'AAPL' }),
-    );
-    await expect(adapter.resolveTicker('AA')).resolves.toBeNull();
+    await expect(adapter.resolveTicker('aapl')).resolves.toEqual({
+      source: 'SEC_EDGAR',
+      status: 'ok',
+      data: expect.objectContaining({ ticker: 'AAPL' }),
+    });
+    await expect(adapter.resolveTicker('AA')).resolves.toEqual({
+      source: 'SEC_EDGAR',
+      status: 'ok',
+      data: null,
+    });
   });
 
   it('fetchProfile() maps a successful submissions response to a NormalizedCompanyProfile', async () => {
@@ -251,7 +261,7 @@ describe('SecEdgarAdapter', () => {
       name: 'Apple Inc.',
       cik: '0000320193',
       exchange: 'Nasdaq',
-      source: 'SEC_EDGAR' as const,
+      sources: ['SEC_EDGAR'] as const,
     };
 
     const result = await adapter.fetchProfile(candidate);
@@ -265,6 +275,10 @@ describe('SecEdgarAdapter', () => {
         cik: '0000320193',
         exchange: 'Nasdaq',
         industry: 'Electronic Computers',
+        country: null,
+        marketCapUsd: null,
+        website: null,
+        logoUrl: null,
       },
     });
     expect(scheduler.fetchJson).toHaveBeenCalledWith(
@@ -285,7 +299,7 @@ describe('SecEdgarAdapter', () => {
       name: 'Apple Inc.',
       cik: '0000320193',
       exchange: 'Nasdaq',
-      source: 'SEC_EDGAR' as const,
+      sources: ['SEC_EDGAR'] as const,
     };
 
     await expect(adapter.fetchProfile(candidate)).resolves.toEqual({
@@ -307,14 +321,14 @@ describe('SecEdgarAdapter', () => {
       name: 'Apple Inc.',
       cik: '0000320193',
       exchange: 'Nasdaq',
-      source: 'SEC_EDGAR' as const,
+      sources: ['SEC_EDGAR'] as const,
     };
 
     const result = await adapter.fetchProfile(candidate);
     expect(result.status).toBe('error');
   });
 
-  it('the ticker directory refresh callback throws when the scheduler reports a non-ok outcome', async () => {
+  it('the ticker directory refresh callback returns an error result when the scheduler reports a non-ok outcome', async () => {
     const cache = { getOrRefresh: jest.fn() };
     const scheduler = {
       fetchJson: jest
@@ -326,8 +340,28 @@ describe('SecEdgarAdapter', () => {
       async (params: { refresh: () => Promise<unknown> }) => params.refresh(),
     );
 
-    await expect(adapter.search('AAPL', 10)).rejects.toThrow(
-      'SEC request failed',
-    );
+    await expect(adapter.search('AAPL', 10)).resolves.toEqual({
+      source: 'SEC_EDGAR',
+      status: 'error',
+      message: 'SEC request failed',
+    });
+  });
+
+  it('fetchProfile() rejects candidates without CIK', async () => {
+    const { adapter } = makeAdapter();
+
+    const result = await adapter.fetchProfile({
+      ticker: 'FOO',
+      name: 'Foo Corp',
+      cik: null,
+      exchange: null,
+      sources: ['SEC_EDGAR'],
+    });
+
+    expect(result).toEqual({
+      source: 'SEC_EDGAR',
+      status: 'error',
+      message: 'SEC profile requires CIK',
+    });
   });
 });

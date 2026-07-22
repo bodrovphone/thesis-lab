@@ -19,6 +19,10 @@ class EnvironmentVariables {
   SEC_EDGAR_USER_AGENT!: string;
 
   @IsOptional()
+  @IsString()
+  FINNHUB_API_KEY?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(65535)

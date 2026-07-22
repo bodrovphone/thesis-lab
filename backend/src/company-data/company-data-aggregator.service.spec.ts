@@ -1,61 +1,248 @@
-import { CompanyDataAggregatorService } from './company-data-aggregator.service';
+import {
+  CompanyDataAggregatorService,
+  mergeSearchCandidates,
+  rankMergedCandidates,
+} from './company-data-aggregator.service';
 import type { CompanySearchCandidate } from './types/company-data.types';
+import { ServiceUnavailableException } from '@nestjs/common';
 
-describe('CompanyDataAggregatorService', () => {
-  function makeAdapter() {
-    return {
-      search: jest.fn(),
-      resolveTicker: jest.fn(),
-      fetchProfile: jest.fn(),
-    };
-  }
+function makeAdapter(source: 'SEC_EDGAR' | 'FINNHUB') {
+  return {
+    source,
+    search: jest.fn(),
+    resolveTicker: jest.fn(),
+    fetchProfile: jest.fn(),
+  };
+}
 
-  it('delegates searchCandidates to the SEC EDGAR adapter search()', async () => {
-    const adapter = makeAdapter();
-    const candidates: CompanySearchCandidate[] = [
+describe('mergeSearchCandidates', () => {
+  it('merges duplicate tickers with Finnhub name precedence and SEC CIK', () => {
+    const groups = new Map<string, CompanySearchCandidate[]>([
+      [
+        'AAPL',
+        [
+          {
+            ticker: 'AAPL',
+            name: 'Apple Inc.',
+            cik: '0000320193',
+            exchange: 'Nasdaq',
+            sources: ['SEC_EDGAR'],
+          },
+          {
+            ticker: 'AAPL',
+            name: 'Apple Inc',
+            cik: null,
+            exchange: null,
+            sources: ['FINNHUB'],
+          },
+        ],
+      ],
+    ]);
+
+    expect(mergeSearchCandidates(groups)).toEqual([
       {
         ticker: 'AAPL',
-        name: 'Apple Inc.',
+        name: 'Apple Inc',
         cik: '0000320193',
         exchange: 'Nasdaq',
-        source: 'SEC_EDGAR',
+        sources: ['SEC_EDGAR', 'FINNHUB'],
       },
-    ];
-    adapter.search.mockResolvedValue(candidates);
-    const aggregator = new CompanyDataAggregatorService(adapter as never);
+    ]);
+  });
+});
 
-    await expect(aggregator.searchCandidates('apple', 5)).resolves.toEqual(
-      candidates,
+describe('rankMergedCandidates', () => {
+  const candidates: CompanySearchCandidate[] = [
+    {
+      ticker: 'AAPL',
+      name: 'Apple Inc.',
+      cik: '0000320193',
+      exchange: 'Nasdaq',
+      sources: ['SEC_EDGAR'],
+    },
+    {
+      ticker: 'AAPL',
+      name: 'Apple Inc.',
+      cik: '0000320193',
+      exchange: 'Nasdaq',
+      sources: ['SEC_EDGAR', 'FINNHUB'],
+    },
+  ];
+
+  it('prefers dual-source candidates within the same tier', () => {
+    const ranked = rankMergedCandidates(candidates, 'AAPL', 1);
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].sources).toEqual(['SEC_EDGAR', 'FINNHUB']);
+  });
+});
+
+describe('CompanyDataAggregatorService', () => {
+  it('returns merged search results when both adapters succeed', async () => {
+    const sec = makeAdapter('SEC_EDGAR');
+    const finnhub = makeAdapter('FINNHUB');
+    sec.search.mockResolvedValue({
+      source: 'SEC_EDGAR',
+      status: 'ok',
+      data: [
+        {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          cik: '0000320193',
+          exchange: 'Nasdaq',
+          sources: ['SEC_EDGAR'],
+        },
+      ],
+    });
+    finnhub.search.mockResolvedValue({
+      source: 'FINNHUB',
+      status: 'ok',
+      data: [
+        {
+          ticker: 'AAPL',
+          name: 'Apple Inc',
+          cik: null,
+          exchange: null,
+          sources: ['FINNHUB'],
+        },
+      ],
+    });
+
+    const aggregator = new CompanyDataAggregatorService(
+      sec as never,
+      finnhub as never,
     );
-    expect(adapter.search).toHaveBeenCalledWith('apple', 5);
+
+    await expect(aggregator.searchCandidates('apple', 5)).resolves.toEqual([
+      {
+        ticker: 'AAPL',
+        name: 'Apple Inc',
+        cik: '0000320193',
+        exchange: 'Nasdaq',
+        sources: ['SEC_EDGAR', 'FINNHUB'],
+      },
+    ]);
   });
 
-  it('delegates resolveCandidate to the SEC EDGAR adapter resolveTicker()', async () => {
-    const adapter = makeAdapter();
-    adapter.resolveTicker.mockResolvedValue(null);
-    const aggregator = new CompanyDataAggregatorService(adapter as never);
+  it('returns SEC-only results when Finnhub is unavailable', async () => {
+    const sec = makeAdapter('SEC_EDGAR');
+    const finnhub = makeAdapter('FINNHUB');
+    sec.search.mockResolvedValue({
+      source: 'SEC_EDGAR',
+      status: 'ok',
+      data: [
+        {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          cik: '0000320193',
+          exchange: 'Nasdaq',
+          sources: ['SEC_EDGAR'],
+        },
+      ],
+    });
+    finnhub.search.mockResolvedValue({
+      source: 'FINNHUB',
+      status: 'disabled',
+      message: 'Finnhub adapter is disabled',
+    });
 
-    await expect(aggregator.resolveCandidate('AAPL')).resolves.toBeNull();
-    expect(adapter.resolveTicker).toHaveBeenCalledWith('AAPL');
+    const aggregator = new CompanyDataAggregatorService(
+      sec as never,
+      finnhub as never,
+    );
+
+    const results = await aggregator.searchCandidates('apple', 5);
+    expect(results).toHaveLength(1);
+    expect(results[0].sources).toEqual(['SEC_EDGAR']);
   });
 
-  it('delegates fetchProfile to the SEC EDGAR adapter', async () => {
-    const adapter = makeAdapter();
+  it('throws when both search adapters fail', async () => {
+    const sec = makeAdapter('SEC_EDGAR');
+    const finnhub = makeAdapter('FINNHUB');
+    sec.search.mockResolvedValue({
+      source: 'SEC_EDGAR',
+      status: 'error',
+      message: 'SEC unavailable',
+    });
+    finnhub.search.mockResolvedValue({
+      source: 'FINNHUB',
+      status: 'error',
+      message: 'Finnhub unavailable',
+    });
+
+    const aggregator = new CompanyDataAggregatorService(
+      sec as never,
+      finnhub as never,
+    );
+
+    await expect(
+      aggregator.searchCandidates('apple', 5),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('throws when Finnhub is unavailable and SEC misses the ticker', async () => {
+    const sec = makeAdapter('SEC_EDGAR');
+    const finnhub = makeAdapter('FINNHUB');
+    sec.resolveTicker.mockResolvedValue({
+      source: 'SEC_EDGAR',
+      status: 'ok',
+      data: null,
+    });
+    finnhub.resolveTicker.mockResolvedValue({
+      source: 'FINNHUB',
+      status: 'disabled',
+      message: 'Finnhub adapter is disabled',
+    });
+
+    const aggregator = new CompanyDataAggregatorService(
+      sec as never,
+      finnhub as never,
+    );
+
+    await expect(aggregator.resolveCandidate('FOOONLY')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
+
+  it('fetchProfiles returns both adapter results in source order', async () => {
+    const sec = makeAdapter('SEC_EDGAR');
+    const finnhub = makeAdapter('FINNHUB');
     const candidate: CompanySearchCandidate = {
       ticker: 'AAPL',
       name: 'Apple Inc.',
       cik: '0000320193',
       exchange: 'Nasdaq',
-      source: 'SEC_EDGAR',
+      sources: ['SEC_EDGAR', 'FINNHUB'],
     };
-    adapter.fetchProfile.mockResolvedValue({
+    sec.fetchProfile.mockResolvedValue({
       source: 'SEC_EDGAR',
       status: 'ok',
-      data: {},
+      data: {
+        ticker: 'AAPL',
+        name: 'Apple Inc.',
+        cik: '0000320193',
+        exchange: 'Nasdaq',
+        industry: 'Electronic Computers',
+        country: null,
+        marketCapUsd: null,
+        website: null,
+        logoUrl: null,
+      },
     });
-    const aggregator = new CompanyDataAggregatorService(adapter as never);
+    finnhub.fetchProfile.mockResolvedValue({
+      source: 'FINNHUB',
+      status: 'timeout',
+      message: 'Finnhub request timed out',
+    });
 
-    await aggregator.fetchProfile(candidate);
-    expect(adapter.fetchProfile).toHaveBeenCalledWith(candidate);
+    const aggregator = new CompanyDataAggregatorService(
+      sec as never,
+      finnhub as never,
+    );
+
+    const results = await aggregator.fetchProfiles(candidate);
+    expect(results.map((result) => result.source)).toEqual([
+      'SEC_EDGAR',
+      'FINNHUB',
+    ]);
   });
 });

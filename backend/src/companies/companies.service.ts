@@ -4,12 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CompanyDataAggregatorService } from '../company-data/company-data-aggregator.service';
+import { mergeCompanyProfile } from '../company-data/merge/merge-company-profile';
 import type { CompanySearchCandidate } from '../company-data/types/company-data.types';
-import {
-  DataSource,
-  EnrichmentStatus,
-  Prisma,
-} from '../generated/prisma/client';
+import { DataSource, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompanySerializer } from './company.serializer';
 import type { CompanyViewDto } from './dto/company-view.dto';
@@ -41,37 +38,30 @@ export class CompaniesService {
 
     const candidate = await this.aggregator.resolveCandidate(normalizedTicker);
     if (!candidate) {
-      throw new NotFoundException('Ticker not found in SEC directory');
+      throw new NotFoundException('Ticker not found in company sources');
     }
 
-    const profileResult = await this.aggregator.fetchProfile(candidate);
+    const profileResults = await this.aggregator.fetchProfiles(candidate);
+    const now = new Date();
+    const merged = mergeCompanyProfile(candidate, profileResults, now);
 
     try {
-      const company =
-        profileResult.status === 'ok'
-          ? await this.prisma.company.create({
-              data: {
-                ticker: candidate.ticker,
-                name: profileResult.data.name,
-                cik: candidate.cik,
-                exchange: candidate.exchange,
-                industry: profileResult.data.industry,
-                sourcesUsed: [DataSource.SEC_EDGAR],
-                enrichmentStatus: EnrichmentStatus.COMPLETE,
-                lastEnrichedAt: new Date(),
-              },
-            })
-          : await this.prisma.company.create({
-              data: {
-                ticker: candidate.ticker,
-                name: candidate.name,
-                cik: candidate.cik,
-                exchange: candidate.exchange,
-                sourcesUsed: [DataSource.SEC_EDGAR],
-                enrichmentStatus: EnrichmentStatus.PARTIAL,
-                lastEnrichedAt: null,
-              },
-            });
+      const company = await this.prisma.company.create({
+        data: {
+          ticker: merged.ticker,
+          name: merged.name,
+          cik: merged.cik,
+          exchange: merged.exchange,
+          industry: merged.industry,
+          country: merged.country,
+          marketCapUsd: merged.marketCapUsd,
+          website: merged.website,
+          logoUrl: merged.logoUrl,
+          sourcesUsed: merged.sourcesUsed.map((source) => DataSource[source]),
+          enrichmentStatus: merged.enrichmentStatus,
+          lastEnrichedAt: merged.lastEnrichedAt,
+        },
+      });
 
       return this.serializer.toView(company);
     } catch (error) {

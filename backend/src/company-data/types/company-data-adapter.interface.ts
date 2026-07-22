@@ -7,7 +7,13 @@ import type {
 
 export interface CompanyDataAdapter {
   readonly source: DataSourceName;
-  search(query: string, limit: number): Promise<CompanySearchCandidate[]>;
+  search(
+    query: string,
+    limit: number,
+  ): Promise<AdapterResult<CompanySearchCandidate[]>>;
+  resolveTicker(
+    ticker: string,
+  ): Promise<AdapterResult<CompanySearchCandidate | null>>;
   fetchProfile(
     candidate: CompanySearchCandidate,
   ): Promise<AdapterResult<NormalizedCompanyProfile>>;
@@ -19,7 +25,7 @@ export interface CompanyDataAggregator {
     limit: number,
   ): Promise<CompanySearchCandidate[]>;
   resolveCandidate(ticker: string): Promise<CompanySearchCandidate | null>;
-  fetchProfile(
+  fetchProfiles(
     candidate: CompanySearchCandidate,
-  ): Promise<AdapterResult<NormalizedCompanyProfile>>;
+  ): Promise<AdapterResult<NormalizedCompanyProfile>[]>;
 }

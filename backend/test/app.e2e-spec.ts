@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { FinnhubSearchCacheService } from '../src/company-data/finnhub/finnhub-search-cache.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Health (e2e)', () => {
@@ -76,6 +77,43 @@ const SEC_SUBMISSIONS_FIXTURES: Record<string, unknown> = {
   },
 };
 
+const FINNHUB_SEARCH_FIXTURE = {
+  count: 1,
+  result: [
+    {
+      description: 'Apple Inc',
+      displaySymbol: 'AAPL',
+      symbol: 'AAPL',
+      type: 'Common Stock',
+    },
+  ],
+};
+
+const FINNHUB_PROFILE_FIXTURES: Record<string, unknown> = {
+  AAPL: {
+    name: 'Apple Inc',
+    ticker: 'AAPL',
+    exchange: 'NASDAQ',
+    finnhubIndustry: 'Technology',
+    country: 'US',
+    currency: 'USD',
+    marketCapitalization: 3000000,
+    weburl: 'https://apple.com',
+    logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/AAPL.png',
+  },
+  FOO: {
+    name: 'Foo Corp',
+    ticker: 'FOO',
+    exchange: 'NASDAQ',
+    finnhubIndustry: 'Retail',
+    country: 'US',
+    currency: 'USD',
+    marketCapitalization: 1.5,
+    weburl: 'https://foo.example',
+    logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/FOO.png',
+  },
+};
+
 function jsonResponse(body: unknown) {
   return Promise.resolve({
     ok: true,
@@ -84,42 +122,89 @@ function jsonResponse(body: unknown) {
   });
 }
 
-function mockSecFetchSuccess() {
+function mockDualSourceFetch(options?: {
+  secDirectoryOk?: boolean;
+  secSubmissionsOk?: boolean;
+  finnhubSearchOk?: boolean;
+  finnhubProfileOk?: boolean;
+  finnhubOnlySearch?: boolean;
+}) {
+  const {
+    secDirectoryOk = true,
+    secSubmissionsOk = true,
+    finnhubSearchOk = true,
+    finnhubProfileOk = true,
+    finnhubOnlySearch = false,
+  } = options ?? {};
+
   global.fetch = jest.fn((input: string | URL) => {
     const url = String(input);
+
     if (url.includes('company_tickers_exchange.json')) {
-      return jsonResponse(SEC_TICKER_DATASET_FIXTURE);
+      return secDirectoryOk
+        ? jsonResponse(SEC_TICKER_DATASET_FIXTURE)
+        : Promise.resolve({ ok: false, status: 503 });
     }
+
     const cikMatch = /CIK(\d{10})\.json/.exec(url);
     if (cikMatch) {
+      if (!secSubmissionsOk) {
+        return Promise.reject(
+          new DOMException('The operation timed out', 'TimeoutError'),
+        );
+      }
       const fixture = SEC_SUBMISSIONS_FIXTURES[cikMatch[1]];
       if (fixture) {
         return jsonResponse(fixture);
       }
     }
+
+    if (url.includes('finnhub.io/api/v1/search')) {
+      if (!finnhubSearchOk) {
+        return Promise.resolve({ ok: false, status: 500 });
+      }
+      if (finnhubOnlySearch) {
+        return jsonResponse({
+          count: 1,
+          result: [
+            {
+              description: 'Foo Corp',
+              displaySymbol: 'FOO',
+              symbol: 'FOO',
+              type: 'Common Stock',
+            },
+          ],
+        });
+      }
+      return jsonResponse(FINNHUB_SEARCH_FIXTURE);
+    }
+
+    if (url.includes('finnhub.io/api/v1/stock/profile2')) {
+      if (!finnhubProfileOk) {
+        return Promise.resolve({ ok: false, status: 500 });
+      }
+      const symbolMatch = /symbol=([^&]+)/.exec(url);
+      const symbol = symbolMatch ? decodeURIComponent(symbolMatch[1]) : '';
+      const fixture = FINNHUB_PROFILE_FIXTURES[symbol];
+      return fixture ? jsonResponse(fixture) : jsonResponse({});
+    }
+
     return Promise.resolve({ ok: false, status: 404 });
   });
 }
 
 function mockSecDirectoryFailure() {
-  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 });
+  mockDualSourceFetch({ secDirectoryOk: false, finnhubSearchOk: false });
 }
 
-function mockSecSubmissionsTimeout() {
-  global.fetch = jest.fn((input: string | URL) => {
-    const url = String(input);
-    if (url.includes('company_tickers_exchange.json')) {
-      return jsonResponse(SEC_TICKER_DATASET_FIXTURE);
-    }
-    return Promise.reject(
-      new DOMException('The operation timed out', 'TimeoutError'),
-    );
-  });
+function mockSecPartialProfile() {
+  mockDualSourceFetch({ finnhubSearchOk: false, finnhubProfileOk: false });
 }
 
 describe('Companies (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let finnhubSearchCache: FinnhubSearchCacheService;
   const originalFetch = global.fetch;
 
   beforeAll(async () => {
@@ -137,6 +222,7 @@ describe('Companies (e2e)', () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
+    finnhubSearchCache = app.get(FinnhubSearchCacheService);
   });
 
   afterAll(async () => {
@@ -146,16 +232,17 @@ describe('Companies (e2e)', () => {
 
   beforeEach(async () => {
     global.fetch = originalFetch;
+    finnhubSearchCache.clear();
     await prisma.company.deleteMany({
-      where: { ticker: { in: ['AAPL', 'MSFT'] } },
+      where: { ticker: { in: ['AAPL', 'MSFT', 'FOO'] } },
     });
     await prisma.externalApiCacheEntry.deleteMany({
       where: { source: 'SEC_EDGAR', cacheKey: 'company_tickers_exchange:v1' },
     });
   });
 
-  it('supports the full search -> create -> list -> get -> duplicate -> missing flow', async () => {
-    mockSecFetchSuccess();
+  it('supports the full dual-source search -> create -> list -> get -> duplicate -> missing flow', async () => {
+    mockDualSourceFetch();
 
     const searchResponse = await request(app.getHttpServer())
       .get('/companies/search-external')
@@ -166,10 +253,10 @@ describe('Companies (e2e)', () => {
       items: [
         {
           ticker: 'AAPL',
-          name: 'Apple Inc.',
+          name: 'Apple Inc',
           cik: '0000320193',
           exchange: 'Nasdaq',
-          source: 'SEC_EDGAR',
+          sources: ['SEC_EDGAR', 'FINNHUB'],
         },
       ],
     });
@@ -181,15 +268,18 @@ describe('Companies (e2e)', () => {
 
     expect(createResponse.body).toMatchObject({
       ticker: 'AAPL',
-      name: 'Apple Inc.',
+      name: 'Apple Inc',
       cik: '0000320193',
-      exchange: 'Nasdaq',
-      industry: 'Electronic Computers',
+      exchange: 'NASDAQ',
+      industry: 'Technology',
+      country: 'US',
+      website: 'https://apple.com',
+      logoUrl: FINNHUB_PROFILE_FIXTURES.AAPL.logo,
+      marketCapUsd: '3000000000000',
       enrichmentStatus: 'COMPLETE',
-      sourcesUsed: ['SEC_EDGAR'],
+      sourcesUsed: ['SEC_EDGAR', 'FINNHUB'],
     });
     const companyId = createResponse.body.id as string;
-    expect(typeof companyId).toBe('string');
 
     const listResponse = await request(app.getHttpServer())
       .get('/companies')
@@ -213,8 +303,8 @@ describe('Companies (e2e)', () => {
     await request(app.getHttpServer()).get('/companies/missing-id').expect(404);
   });
 
-  it('persists a PARTIAL company and still returns 201 when the submissions profile times out', async () => {
-    mockSecSubmissionsTimeout();
+  it('persists a PARTIAL company and still returns 201 when only the SEC profile succeeds', async () => {
+    mockSecPartialProfile();
 
     const response = await request(app.getHttpServer())
       .post('/companies')
@@ -225,12 +315,44 @@ describe('Companies (e2e)', () => {
       ticker: 'MSFT',
       name: 'Microsoft Corporation',
       enrichmentStatus: 'PARTIAL',
-      lastEnrichedAt: null,
       sourcesUsed: ['SEC_EDGAR'],
     });
+    expect(response.body.lastEnrichedAt).toEqual(expect.any(String));
   });
 
-  it('returns 503 for search when the SEC directory is unavailable and there is no cache', async () => {
+  it('returns SEC candidates when Finnhub search fails', async () => {
+    mockDualSourceFetch({ finnhubSearchOk: false });
+
+    const response = await request(app.getHttpServer())
+      .get('/companies/search-external')
+      .query({ q: 'apple' })
+      .expect(200);
+
+    expect(response.body.items).toEqual([
+      expect.objectContaining({
+        ticker: 'AAPL',
+        sources: ['SEC_EDGAR'],
+      }),
+    ]);
+  });
+
+  it('returns Finnhub candidates when SEC search fails', async () => {
+    mockDualSourceFetch({ secDirectoryOk: false, finnhubOnlySearch: true });
+
+    const response = await request(app.getHttpServer())
+      .get('/companies/search-external')
+      .query({ q: 'foo' })
+      .expect(200);
+
+    expect(response.body.items).toEqual([
+      expect.objectContaining({
+        ticker: 'FOO',
+        sources: ['FINNHUB'],
+      }),
+    ]);
+  });
+
+  it('returns 503 for search when both sources fail', async () => {
     mockSecDirectoryFailure();
 
     await request(app.getHttpServer())
@@ -240,7 +362,7 @@ describe('Companies (e2e)', () => {
   });
 
   it('returns 400 when the search query is too short', async () => {
-    mockSecFetchSuccess();
+    mockDualSourceFetch();
 
     await request(app.getHttpServer())
       .get('/companies/search-external')
@@ -248,12 +370,52 @@ describe('Companies (e2e)', () => {
       .expect(400);
   });
 
-  it('returns 404 when creating a ticker absent from the SEC directory', async () => {
-    mockSecFetchSuccess();
+  it('returns 404 when creating a ticker absent from all sources', async () => {
+    mockDualSourceFetch();
 
     await request(app.getHttpServer())
       .post('/companies')
       .send({ ticker: 'ZZZZZZ' })
       .expect(404);
+  });
+
+  it('creates a Finnhub-only company with null CIK when Finnhub profile succeeds', async () => {
+    mockDualSourceFetch({ secDirectoryOk: false, finnhubOnlySearch: true });
+
+    await request(app.getHttpServer())
+      .get('/companies/search-external')
+      .query({ q: 'foo' })
+      .expect(200);
+
+    const response = await request(app.getHttpServer())
+      .post('/companies')
+      .send({ ticker: 'FOO' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      ticker: 'FOO',
+      name: 'Foo Corp',
+      cik: null,
+      enrichmentStatus: 'PARTIAL',
+      sourcesUsed: ['FINNHUB'],
+      country: 'US',
+    });
+  });
+
+  it('creates a FAILED minimal company when both profiles fail after resolution', async () => {
+    mockDualSourceFetch({ secSubmissionsOk: false, finnhubProfileOk: false });
+
+    const response = await request(app.getHttpServer())
+      .post('/companies')
+      .send({ ticker: 'AAPL' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      ticker: 'AAPL',
+      name: 'Apple Inc',
+      enrichmentStatus: 'FAILED',
+      lastEnrichedAt: null,
+      sourcesUsed: ['SEC_EDGAR', 'FINNHUB'],
+    });
   });
 });

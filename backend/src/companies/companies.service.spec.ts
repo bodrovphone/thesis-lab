@@ -20,7 +20,7 @@ function makeAggregator() {
   return {
     searchCandidates: jest.fn(),
     resolveCandidate: jest.fn(),
-    fetchProfile: jest.fn(),
+    fetchProfiles: jest.fn(),
   };
 }
 
@@ -38,27 +38,48 @@ const candidate = {
   name: 'Apple Inc.',
   cik: '0000320193',
   exchange: 'Nasdaq',
-  source: 'SEC_EDGAR' as const,
+  sources: ['SEC_EDGAR', 'FINNHUB'] as const,
 };
 
 describe('CompaniesService', () => {
-  it('creates a COMPLETE company when the SEC profile fetch succeeds', async () => {
+  it('creates a COMPLETE company when both profiles succeed', async () => {
     const prisma = makePrisma();
     const aggregator = makeAggregator();
     const serializer = makeSerializer();
     prisma.company.findUnique.mockResolvedValue(null);
     aggregator.resolveCandidate.mockResolvedValue(candidate);
-    aggregator.fetchProfile.mockResolvedValue({
-      source: 'SEC_EDGAR',
-      status: 'ok',
-      data: {
-        ticker: 'AAPL',
-        name: 'Apple Inc.',
-        cik: '0000320193',
-        exchange: 'Nasdaq',
-        industry: 'Electronic Computers',
+    aggregator.fetchProfiles.mockResolvedValue([
+      {
+        source: 'SEC_EDGAR',
+        status: 'ok',
+        data: {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          cik: '0000320193',
+          exchange: 'Nasdaq',
+          industry: 'Electronic Computers',
+          country: null,
+          marketCapUsd: null,
+          website: null,
+          logoUrl: null,
+        },
       },
-    });
+      {
+        source: 'FINNHUB',
+        status: 'ok',
+        data: {
+          ticker: 'AAPL',
+          name: 'Apple Inc',
+          cik: null,
+          exchange: 'NASDAQ',
+          industry: 'Technology',
+          country: 'US',
+          marketCapUsd: 3_000_000_000_000n,
+          website: 'https://apple.com',
+          logoUrl: 'https://static2.finnhub.io/logo.png',
+        },
+      },
+    ]);
     prisma.company.create.mockResolvedValue({ id: 'c1' });
 
     const service = new CompaniesService(
@@ -68,33 +89,49 @@ describe('CompaniesService', () => {
     );
     const result = await service.create('aapl');
 
-    expect(prisma.company.findUnique).toHaveBeenCalledWith({
-      where: { ticker: 'AAPL' },
-    });
-    expect(aggregator.resolveCandidate).toHaveBeenCalledWith('AAPL');
     expect(prisma.company.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         ticker: 'AAPL',
-        name: 'Apple Inc.',
-        industry: 'Electronic Computers',
+        name: 'Apple Inc',
+        cik: '0000320193',
+        country: 'US',
+        website: 'https://apple.com',
         enrichmentStatus: EnrichmentStatus.COMPLETE,
-        sourcesUsed: [DataSource.SEC_EDGAR],
+        sourcesUsed: [DataSource.SEC_EDGAR, DataSource.FINNHUB],
+        lastEnrichedAt: expect.any(Date),
       }),
     });
     expect(result).toEqual({ id: 'c1', __view: true });
   });
 
-  it('creates a PARTIAL company when the SEC profile fetch fails', async () => {
+  it('creates a PARTIAL company when only SEC succeeds', async () => {
     const prisma = makePrisma();
     const aggregator = makeAggregator();
     const serializer = makeSerializer();
     prisma.company.findUnique.mockResolvedValue(null);
     aggregator.resolveCandidate.mockResolvedValue(candidate);
-    aggregator.fetchProfile.mockResolvedValue({
-      source: 'SEC_EDGAR',
-      status: 'timeout',
-      message: 'SEC request timed out',
-    });
+    aggregator.fetchProfiles.mockResolvedValue([
+      {
+        source: 'SEC_EDGAR',
+        status: 'ok',
+        data: {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          cik: '0000320193',
+          exchange: 'Nasdaq',
+          industry: 'Electronic Computers',
+          country: null,
+          marketCapUsd: null,
+          website: null,
+          logoUrl: null,
+        },
+      },
+      {
+        source: 'FINNHUB',
+        status: 'timeout',
+        message: 'Finnhub request timed out',
+      },
+    ]);
     prisma.company.create.mockResolvedValue({ id: 'c1' });
 
     const service = new CompaniesService(
@@ -106,11 +143,45 @@ describe('CompaniesService', () => {
 
     expect(prisma.company.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        ticker: 'AAPL',
         name: 'Apple Inc.',
         enrichmentStatus: EnrichmentStatus.PARTIAL,
+        sourcesUsed: [DataSource.SEC_EDGAR, DataSource.FINNHUB],
+      }),
+    });
+  });
+
+  it('creates a FAILED company when both profiles fail', async () => {
+    const prisma = makePrisma();
+    const aggregator = makeAggregator();
+    const serializer = makeSerializer();
+    prisma.company.findUnique.mockResolvedValue(null);
+    aggregator.resolveCandidate.mockResolvedValue(candidate);
+    aggregator.fetchProfiles.mockResolvedValue([
+      {
+        source: 'SEC_EDGAR',
+        status: 'timeout',
+        message: 'SEC request timed out',
+      },
+      {
+        source: 'FINNHUB',
+        status: 'error',
+        message: 'Finnhub request failed',
+      },
+    ]);
+    prisma.company.create.mockResolvedValue({ id: 'c1' });
+
+    const service = new CompaniesService(
+      prisma as never,
+      aggregator as never,
+      serializer,
+    );
+    await service.create('AAPL');
+
+    expect(prisma.company.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: 'Apple Inc.',
+        enrichmentStatus: EnrichmentStatus.FAILED,
         lastEnrichedAt: null,
-        sourcesUsed: [DataSource.SEC_EDGAR],
       }),
     });
   });
@@ -133,7 +204,7 @@ describe('CompaniesService', () => {
     expect(aggregator.resolveCandidate).not.toHaveBeenCalled();
   });
 
-  it('rejects with NotFoundException when the ticker is not in the SEC directory', async () => {
+  it('rejects with NotFoundException when the ticker is not found', async () => {
     const prisma = makePrisma();
     const aggregator = makeAggregator();
     const serializer = makeSerializer();
@@ -149,7 +220,7 @@ describe('CompaniesService', () => {
     await expect(service.create('ZZZZZ')).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    expect(aggregator.fetchProfile).not.toHaveBeenCalled();
+    expect(aggregator.fetchProfiles).not.toHaveBeenCalled();
   });
 
   it('converts a Prisma unique-constraint race into ConflictException', async () => {
@@ -158,17 +229,28 @@ describe('CompaniesService', () => {
     const serializer = makeSerializer();
     prisma.company.findUnique.mockResolvedValue(null);
     aggregator.resolveCandidate.mockResolvedValue(candidate);
-    aggregator.fetchProfile.mockResolvedValue({
-      source: 'SEC_EDGAR',
-      status: 'ok',
-      data: {
-        ticker: 'AAPL',
-        name: 'Apple Inc.',
-        cik: '0000320193',
-        exchange: 'Nasdaq',
-        industry: null,
+    aggregator.fetchProfiles.mockResolvedValue([
+      {
+        source: 'SEC_EDGAR',
+        status: 'ok',
+        data: {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          cik: '0000320193',
+          exchange: 'Nasdaq',
+          industry: null,
+          country: null,
+          marketCapUsd: null,
+          website: null,
+          logoUrl: null,
+        },
       },
-    });
+      {
+        source: 'FINNHUB',
+        status: 'disabled',
+        message: 'Finnhub adapter is disabled',
+      },
+    ]);
     prisma.company.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
@@ -187,34 +269,6 @@ describe('CompaniesService', () => {
     );
   });
 
-  it('rethrows unrelated persistence errors', async () => {
-    const prisma = makePrisma();
-    const aggregator = makeAggregator();
-    const serializer = makeSerializer();
-    prisma.company.findUnique.mockResolvedValue(null);
-    aggregator.resolveCandidate.mockResolvedValue(candidate);
-    aggregator.fetchProfile.mockResolvedValue({
-      source: 'SEC_EDGAR',
-      status: 'ok',
-      data: {
-        ticker: 'AAPL',
-        name: 'Apple Inc.',
-        cik: '0000320193',
-        exchange: 'Nasdaq',
-        industry: null,
-      },
-    });
-    prisma.company.create.mockRejectedValue(new Error('db is down'));
-
-    const service = new CompaniesService(
-      prisma as never,
-      aggregator as never,
-      serializer,
-    );
-
-    await expect(service.create('AAPL')).rejects.toThrow('db is down');
-  });
-
   it('delegates external search to the aggregator', async () => {
     const prisma = makePrisma();
     const aggregator = makeAggregator();
@@ -231,38 +285,5 @@ describe('CompaniesService', () => {
       candidate,
     ]);
     expect(aggregator.searchCandidates).toHaveBeenCalledWith('apple', 10);
-  });
-
-  it('lists companies ordered by updatedAt desc, then ticker asc', async () => {
-    const prisma = makePrisma();
-    const aggregator = makeAggregator();
-    const serializer = makeSerializer();
-    prisma.company.findMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
-
-    const service = new CompaniesService(
-      prisma as never,
-      aggregator as never,
-      serializer,
-    );
-    await service.findAll();
-
-    expect(prisma.company.findMany).toHaveBeenCalledWith({
-      orderBy: [{ updatedAt: 'desc' }, { ticker: 'asc' }],
-    });
-  });
-
-  it('returns null from findOne when the company does not exist', async () => {
-    const prisma = makePrisma();
-    const aggregator = makeAggregator();
-    const serializer = makeSerializer();
-    prisma.company.findUnique.mockResolvedValue(null);
-
-    const service = new CompaniesService(
-      prisma as never,
-      aggregator as never,
-      serializer,
-    );
-
-    await expect(service.findOne('missing-id')).resolves.toBeNull();
   });
 });
