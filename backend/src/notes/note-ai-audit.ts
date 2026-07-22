@@ -1,4 +1,4 @@
-import type { BusinessModel, MoatPattern } from '../../generated/prisma/client';
+import type { BusinessModel, MoatPattern } from '../generated/prisma/client';
 
 export interface NoteAiAuditInput {
   suggestedMoatPattern?: MoatPattern | null;

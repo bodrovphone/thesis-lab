@@ -11,7 +11,7 @@ import { DataSource, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompanySerializer } from './company.serializer';
 import type { CompanyViewDto } from './dto/company-view.dto';
-import type { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
+import { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
 
 export interface CompanyListResult {
   items: CompanyViewDto[];
@@ -84,7 +84,9 @@ export class CompaniesService {
     }
   }
 
-  async findAll(query: ListCompaniesQueryDto = {}): Promise<CompanyListResult> {
+  async findAll(
+    query: ListCompaniesQueryDto = new ListCompaniesQueryDto(),
+  ): Promise<CompanyListResult> {
     const totalTracked = await this.prisma.company.count();
     const andConditions: Prisma.CompanyWhereInput[] = [];
 
