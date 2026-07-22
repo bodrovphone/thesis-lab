@@ -8,6 +8,7 @@ function makeService() {
     findAll: jest.fn(),
     findOne: jest.fn(),
     updateConviction: jest.fn(),
+    updateSummary: jest.fn(),
   };
 }
 
@@ -74,5 +75,21 @@ describe('CompaniesController', () => {
       controller.update('c1', { convictionLevel: 'HIGH_CONVICTION' }),
     ).resolves.toEqual({ id: 'c1', convictionLevel: 'HIGH_CONVICTION' });
     expect(service.updateConviction).toHaveBeenCalledWith('c1', 'HIGH_CONVICTION');
+  });
+
+  it('delegates summary updates to the service', async () => {
+    const service = makeService();
+    service.updateSummary.mockResolvedValue({
+      id: 'c1',
+      currentThinkingSummary: 'Updated thesis',
+    });
+    const controller = new CompaniesController(service as never);
+
+    await expect(
+      controller.updateSummary('c1', {
+        currentThinkingSummary: 'Updated thesis',
+      }),
+    ).resolves.toEqual({ id: 'c1', currentThinkingSummary: 'Updated thesis' });
+    expect(service.updateSummary).toHaveBeenCalledWith('c1', 'Updated thesis');
   });
 });

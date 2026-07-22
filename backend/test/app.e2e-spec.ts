@@ -664,4 +664,27 @@ describe('Notes and taxonomy (e2e)', () => {
       tagEditedByUser: true,
     });
   });
+
+  it('persists current thinking summary via PATCH /companies/:id/summary', async () => {
+    const company = await prisma.company.create({
+      data: {
+        ticker: 'NOTE1',
+        name: 'Notes Test Co',
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .patch(`/companies/${company.id}/summary`)
+      .send({ currentThinkingSummary: '  Platform moat is strengthening.  ' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      currentThinkingSummary: 'Platform moat is strengthening.',
+    });
+    expect(response.body.summaryGeneratedAt).toEqual(expect.any(String));
+
+    const stored = await prisma.company.findUnique({ where: { id: company.id } });
+    expect(stored?.currentThinkingSummary).toBe('Platform moat is strengthening.');
+    expect(stored?.summaryGeneratedAt).toBeInstanceOf(Date);
+  });
 });

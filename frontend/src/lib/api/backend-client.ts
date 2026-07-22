@@ -124,6 +124,23 @@ export async function updateCompanyConviction(
   return (await response.json()) as CompanyView;
 }
 
+export async function updateCompanySummary(
+  id: string,
+  currentThinkingSummary: string,
+): Promise<CompanyView> {
+  const response = await backendFetch(
+    `/companies/${encodeURIComponent(id)}/summary`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ currentThinkingSummary }),
+    },
+  );
+  if (!response.ok) {
+    await throwForFailedResponse(response);
+  }
+  return (await response.json()) as CompanyView;
+}
+
 export async function createNote(
   companyId: string,
   input: {

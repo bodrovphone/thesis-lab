@@ -118,4 +118,27 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
   }
+
+  async updateSummary(
+    id: string,
+    currentThinkingSummary: string,
+  ): Promise<CompanyViewDto> {
+    try {
+      const company = await this.prisma.company.update({
+        where: { id },
+        data: {
+          currentThinkingSummary: currentThinkingSummary.trim(),
+          summaryGeneratedAt: new Date(),
+        },
+        include: {
+          notes: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+      return this.serializer.toView(company, company.notes);
+    } catch {
+      throw new NotFoundException('Company not found');
+    }
+  }
 }

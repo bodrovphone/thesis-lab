@@ -15,6 +15,7 @@ import { SearchExternalQueryDto } from './dto/search-external-query.dto';
 import type { SearchCandidateDto } from './dto/search-candidate.dto';
 import type { CompanyViewDto } from './dto/company-view.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { UpdateCompanySummaryDto } from './dto/update-company-summary.dto';
 
 @Controller('companies')
 export class CompaniesController {
@@ -50,6 +51,14 @@ export class CompaniesController {
       throw new NotFoundException('Company not found');
     }
     return company;
+  }
+
+  @Patch(':id/summary')
+  updateSummary(
+    @Param('id') id: string,
+    @Body() dto: UpdateCompanySummaryDto,
+  ): Promise<CompanyViewDto> {
+    return this.companiesService.updateSummary(id, dto.currentThinkingSummary);
   }
 
   @Patch(':id')

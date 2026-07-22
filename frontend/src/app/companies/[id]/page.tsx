@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CompanyNotebook } from '@/components/company-notebook';
 import { ConvictionSelector } from '@/components/conviction-selector';
+import { CurrentThinkingPanel } from '@/components/current-thinking-panel';
 import { getCompany, getTags } from '@/lib/api/backend-client';
 import {
   formatEnrichmentBadge,
@@ -118,6 +119,13 @@ export default async function CompanyDetailPage({
       </dl>
 
       <p className="text-muted text-sm">Added {addedDate}</p>
+
+      <CurrentThinkingPanel
+        companyId={company.id}
+        noteCount={notes.length}
+        initialSummary={company.currentThinkingSummary}
+        initialGeneratedAt={company.summaryGeneratedAt}
+      />
 
       <CompanyNotebook
         companyId={company.id}
