@@ -9,6 +9,8 @@ This repository organizes all work — ideas, technical specs, implementation-re
 
 This file (`AGENTS.md`) is the tool-agnostic source of truth for the process — written so any LLM coding agent (Claude Code, Cursor, Codex, or otherwise) can read it and follow the same procedure, independent of any single tool's skill/extension mechanism.
 
+`browser-tasks/` is a separate, non-pipeline folder: standalone browser-automation jobs (registering accounts, obtaining API keys) meant for a browser-capable agent to pick up one file at a time. It has no `stage`/`domain` frontmatter, no sign-off gate, and is exempt from the `advance-task` procedure entirely — treat it like a `pipeline_role: reference` folder by default, never advance or move files out of it via that procedure. See `browser-tasks/README.md`.
+
 ## Frontmatter convention
 
 Every task file carries YAML frontmatter:

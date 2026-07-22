@@ -14,6 +14,7 @@ First of the two AI features. Suggests a moat-pattern/business-model pair from n
 
 ## Scope
 - `frontend/app/api/tag-suggest/route.ts`: **`generateText` with `Output.object()`** (AI SDK v6's current structured-output pattern — `generateObject`/`streamObject` are deprecated and slated for removal, folded into the `generateText`/`streamText` flow instead) using a Zod schema of nullable moat/business-model enums, capped input length. Model failure, timeout, or invalid output (`AI_NoObjectGeneratedError`) must never block saving the note — fall back to manual selection and record no suggestion.
+- Model provider: **Gemini Flash via `@ai-sdk/google`** (`model: google('<flash-model-id>')`, key in `GOOGLE_GENERATIVE_AI_API_KEY`) — not Anthropic/OpenAI. Confirm the exact model id string against `@ai-sdk/google`'s current docs at implementation time.
 - Wired into the note form from `05-notes-crud-tagging` so a suggestion pre-fills the manual selectors, which the user can accept or override.
 - Records whether the AI suggestion was accepted or overridden (`aiSuggestedMoatPattern`/`aiSuggestedBusinessModel`/`tagEditedByUser` on `Note`).
 

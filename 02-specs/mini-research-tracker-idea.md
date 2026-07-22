@@ -153,14 +153,14 @@ Persisting the current summary makes the company page fast and preserves the las
 
 - Create a Finnhub account and obtain an API key.
 - Decide whether Alpha Vantage enrichment is enabled for the first release; if enabled, create an account and obtain an API key.
-- Choose an AI provider supported by the AI SDK and obtain its API key.
+- Obtain a Google AI Studio API key for Gemini (`GOOGLE_GENERATIVE_AI_API_KEY`, `@ai-sdk/google` provider) — decided below, no longer open.
 - Provide a descriptive SEC `User-Agent` value containing an application identifier and contact information.
 - Create a Neon project and obtain both pooled runtime and direct migration connection strings before hosted integration testing.
 - If deployment is approved later, create or confirm Vercel and Render accounts and connect the repository through their dashboards.
 
 ## Open Questions
 
-1. Which AI provider should be the default for the first release?
+1. ~~Which AI provider should be the default for the first release?~~ **Decided:** Gemini Flash (via `@ai-sdk/google`, `GOOGLE_GENERATIVE_AI_API_KEY`) — existing balance on that account, not Anthropic. Confirm the exact model id string (e.g. `gemini-2.5-flash` vs whichever Flash tier the balance is on) against `@ai-sdk/google`'s current docs at implementation time, since Google's Flash naming has moved across versions.
 2. Should regenerating the current thesis overwrite the previous summary, or should users be able to inspect summary history?
 3. Is a hosted demo part of the first milestone, or is a reproducible local build sufficient initially?
 4. Should Alpha Vantage be enabled in the initial build despite its 25-request daily free limit, or remain a documented optional adapter?

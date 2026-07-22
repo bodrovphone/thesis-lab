@@ -16,4 +16,6 @@ Or start backend and frontend together:
 npm run dev
 ```
 
-App URL: http://localhost:3000
+Local app URL: http://localhost:3000
+
+Production deployment: https://thesis-lab-frontend.vercel.app
