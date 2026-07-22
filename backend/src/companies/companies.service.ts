@@ -11,6 +11,12 @@ import { DataSource, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompanySerializer } from './company.serializer';
 import type { CompanyViewDto } from './dto/company-view.dto';
+import type { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
+
+export interface CompanyListResult {
+  items: CompanyViewDto[];
+  totalTracked: number;
+}
 
 @Injectable()
 export class CompaniesService {
@@ -78,11 +84,39 @@ export class CompaniesService {
     }
   }
 
-  async findAll(): Promise<CompanyViewDto[]> {
+  async findAll(query: ListCompaniesQueryDto = {}): Promise<CompanyListResult> {
+    const totalTracked = await this.prisma.company.count();
+    const andConditions: Prisma.CompanyWhereInput[] = [];
+
+    if (query.conviction) {
+      andConditions.push({ convictionLevel: query.conviction });
+    }
+
+    if (query.moatPattern?.length) {
+      andConditions.push({
+        notes: { some: { moatPattern: { in: query.moatPattern } } },
+      });
+    }
+
+    if (query.businessModel?.length) {
+      andConditions.push({
+        notes: { some: { businessModel: { in: query.businessModel } } },
+      });
+    }
+
+    const where: Prisma.CompanyWhereInput =
+      andConditions.length > 0 ? { AND: andConditions } : {};
+
     const companies = await this.prisma.company.findMany({
+      where,
       orderBy: [{ updatedAt: 'desc' }, { ticker: 'asc' }],
+      take: query.limit ?? 100,
     });
-    return companies.map((company) => this.serializer.toView(company));
+
+    return {
+      items: companies.map((company) => this.serializer.toView(company)),
+      totalTracked,
+    };
   }
 
   async findOne(id: string): Promise<CompanyViewDto | null> {

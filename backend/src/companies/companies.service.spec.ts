@@ -12,6 +12,7 @@ function makePrisma() {
       findUnique: jest.fn(),
       create: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
   };
 }
@@ -293,5 +294,68 @@ describe('CompaniesService', () => {
       candidate,
     ]);
     expect(aggregator.searchCandidates).toHaveBeenCalledWith('apple', 10);
+  });
+
+  it('returns all companies with totalTracked when no filters are provided', async () => {
+    const prisma = makePrisma();
+    const aggregator = makeAggregator();
+    const serializer = makeSerializer();
+    prisma.company.count.mockResolvedValue(2);
+    prisma.company.findMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
+
+    const service = new CompaniesService(
+      prisma as never,
+      aggregator as never,
+      serializer,
+    );
+
+    const result = await service.findAll({ limit: 100 });
+
+    expect(prisma.company.count).toHaveBeenCalled();
+    expect(prisma.company.findMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: [{ updatedAt: 'desc' }, { ticker: 'asc' }],
+      take: 100,
+    });
+    expect(result).toEqual({
+      items: [
+        { id: 'c1', __view: true },
+        { id: 'c2', __view: true },
+      ],
+      totalTracked: 2,
+    });
+  });
+
+  it('applies conviction and note-tag filters with AND semantics', async () => {
+    const prisma = makePrisma();
+    const aggregator = makeAggregator();
+    const serializer = makeSerializer();
+    prisma.company.count.mockResolvedValue(5);
+    prisma.company.findMany.mockResolvedValue([{ id: 'c1' }]);
+
+    const service = new CompaniesService(
+      prisma as never,
+      aggregator as never,
+      serializer,
+    );
+
+    await service.findAll({
+      conviction: 'HIGH_CONVICTION',
+      moatPattern: ['NETWORK_EFFECTS'],
+      businessModel: ['B2B_SOFTWARE'],
+      limit: 25,
+    });
+
+    expect(prisma.company.findMany).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          { convictionLevel: 'HIGH_CONVICTION' },
+          { notes: { some: { moatPattern: { in: ['NETWORK_EFFECTS'] } } } },
+          { notes: { some: { businessModel: { in: ['B2B_SOFTWARE'] } } } },
+        ],
+      },
+      orderBy: [{ updatedAt: 'desc' }, { ticker: 'asc' }],
+      take: 25,
+    });
   });
 });

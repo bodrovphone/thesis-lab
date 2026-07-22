@@ -58,13 +58,42 @@ async function throwForFailedResponse(response: Response): Promise<never> {
   throw new BackendApiError(response.status, await readSafeErrorMessage(response));
 }
 
-export async function listCompanies(): Promise<CompanyView[]> {
-  const response = await backendFetch('/companies');
+export interface ListCompaniesFilters {
+  conviction?: string;
+  moatPattern?: string;
+  businessModel?: string;
+  limit?: number;
+}
+
+export interface ListCompaniesResult {
+  items: CompanyView[];
+  totalTracked: number;
+}
+
+export async function listCompanies(
+  filters?: ListCompaniesFilters,
+): Promise<ListCompaniesResult> {
+  const params = new URLSearchParams();
+  if (filters?.conviction) {
+    params.set('conviction', filters.conviction);
+  }
+  if (filters?.moatPattern) {
+    params.set('moatPattern', filters.moatPattern);
+  }
+  if (filters?.businessModel) {
+    params.set('businessModel', filters.businessModel);
+  }
+  if (filters?.limit) {
+    params.set('limit', String(filters.limit));
+  }
+
+  const query = params.toString();
+  const path = query ? `/companies?${query}` : '/companies';
+  const response = await backendFetch(path);
   if (!response.ok) {
     await throwForFailedResponse(response);
   }
-  const body = (await response.json()) as { items: CompanyView[] };
-  return body.items;
+  return (await response.json()) as ListCompaniesResult;
 }
 
 export async function getCompany(id: string): Promise<CompanyView | null> {

@@ -16,6 +16,7 @@ import type { SearchCandidateDto } from './dto/search-candidate.dto';
 import type { CompanyViewDto } from './dto/company-view.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { UpdateCompanySummaryDto } from './dto/update-company-summary.dto';
+import { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
 
 @Controller('companies')
 export class CompaniesController {
@@ -39,9 +40,10 @@ export class CompaniesController {
   }
 
   @Get()
-  async findAll(): Promise<{ items: CompanyViewDto[] }> {
-    const items = await this.companiesService.findAll();
-    return { items };
+  async findAll(
+    @Query() query: ListCompaniesQueryDto,
+  ): Promise<{ items: CompanyViewDto[]; totalTracked: number }> {
+    return this.companiesService.findAll(query);
   }
 
   @Get(':id')

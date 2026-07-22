@@ -38,14 +38,18 @@ describe('CompaniesController', () => {
     expect(service.create).toHaveBeenCalledWith('aapl');
   });
 
-  it('wraps the company list in an items envelope', async () => {
+  it('wraps the company list in an items envelope with totalTracked', async () => {
     const service = makeService();
-    service.findAll.mockResolvedValue([{ id: 'c1' }]);
+    service.findAll.mockResolvedValue({ items: [{ id: 'c1' }], totalTracked: 3 });
     const controller = new CompaniesController(service as never);
 
-    await expect(controller.findAll()).resolves.toEqual({
+    await expect(
+      controller.findAll({ limit: 100 } as never),
+    ).resolves.toEqual({
       items: [{ id: 'c1' }],
+      totalTracked: 3,
     });
+    expect(service.findAll).toHaveBeenCalledWith({ limit: 100 });
   });
 
   it('throws NotFoundException when the company does not exist', async () => {

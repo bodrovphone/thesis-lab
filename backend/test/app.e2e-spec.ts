@@ -314,6 +314,7 @@ describe('Companies (e2e)', () => {
     expect(listResponse.body.items).toEqual(
       expect.arrayContaining([expect.objectContaining({ ticker: 'AAPL' })]),
     );
+    expect(listResponse.body.totalTracked).toEqual(expect.any(Number));
 
     const getResponse = await request(app.getHttpServer())
       .get(`/companies/${companyId}`)
@@ -686,5 +687,128 @@ describe('Notes and taxonomy (e2e)', () => {
     const stored = await prisma.company.findUnique({ where: { id: company.id } });
     expect(stored?.currentThinkingSummary).toBe('Platform moat is strengthening.');
     expect(stored?.summaryGeneratedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('Company list filters (e2e)', () => {
+  let app: INestApplication<App>;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    await app.init();
+    prisma = app.get(PrismaService);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    await prisma.note.deleteMany({});
+    await prisma.company.deleteMany({
+      where: { ticker: { in: ['FILTA', 'FILTB', 'FILTC'] } },
+    });
+  });
+
+  it('filters companies by conviction and note taxonomy with AND semantics', async () => {
+    await prisma.company.create({
+      data: {
+        ticker: 'FILTA',
+        name: 'Filter Match Co',
+        convictionLevel: 'HIGH_CONVICTION',
+        notes: {
+          create: {
+            body: 'Network effects are strengthening.',
+            moatPattern: 'NETWORK_EFFECTS',
+            businessModel: 'B2B_SOFTWARE',
+          },
+        },
+      },
+    });
+
+    await prisma.company.create({
+      data: {
+        ticker: 'FILTB',
+        name: 'Wrong Conviction Co',
+        convictionLevel: 'WATCHING',
+        notes: {
+          create: {
+            body: 'Also network effects.',
+            moatPattern: 'NETWORK_EFFECTS',
+            businessModel: 'B2B_SOFTWARE',
+          },
+        },
+      },
+    });
+
+    await prisma.company.create({
+      data: {
+        ticker: 'FILTC',
+        name: 'Wrong Tags Co',
+        convictionLevel: 'HIGH_CONVICTION',
+        notes: {
+          create: {
+            body: 'Different moat.',
+            moatPattern: 'BRAND',
+            businessModel: 'FRANCHISOR',
+          },
+        },
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/companies')
+      .query({
+        conviction: 'HIGH_CONVICTION',
+        moatPattern: 'NETWORK_EFFECTS',
+        businessModel: 'B2B_SOFTWARE',
+      })
+      .expect(200);
+
+    expect(response.body.totalTracked).toBeGreaterThanOrEqual(3);
+    const matchedTickers = response.body.items
+      .map((company: { ticker: string }) => company.ticker)
+      .filter((ticker: string) => ['FILTA', 'FILTB', 'FILTC'].includes(ticker));
+    expect(matchedTickers).toEqual(['FILTA']);
+  });
+
+  it('excludes companies without matching notes from tag-filtered results', async () => {
+    const noNotesCompany = await prisma.company.create({
+      data: {
+        ticker: 'FILTA',
+        name: 'No Notes Co',
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/companies')
+      .query({ moatPattern: 'NETWORK_EFFECTS' })
+      .expect(200);
+
+    expect(response.body.totalTracked).toBeGreaterThan(0);
+    expect(
+      response.body.items.find(
+        (company: { id: string }) => company.id === noNotesCompany.id,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('rejects unknown conviction filter values', async () => {
+    await request(app.getHttpServer())
+      .get('/companies')
+      .query({ conviction: 'NOT_A_LEVEL' })
+      .expect(400);
   });
 });
