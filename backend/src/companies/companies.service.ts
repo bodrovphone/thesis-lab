@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { ConvictionLevel } from '../generated/prisma/client';
 import { CompanyDataAggregatorService } from '../company-data/company-data-aggregator.service';
 import { mergeCompanyProfile } from '../company-data/merge/merge-company-profile';
 import type { CompanySearchCandidate } from '../company-data/types/company-data.types';
@@ -85,7 +86,36 @@ export class CompaniesService {
   }
 
   async findOne(id: string): Promise<CompanyViewDto | null> {
-    const company = await this.prisma.company.findUnique({ where: { id } });
-    return company ? this.serializer.toView(company) : null;
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      include: {
+        notes: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    return company
+      ? this.serializer.toView(company, company.notes)
+      : null;
+  }
+
+  async updateConviction(
+    id: string,
+    convictionLevel: ConvictionLevel,
+  ): Promise<CompanyViewDto> {
+    try {
+      const company = await this.prisma.company.update({
+        where: { id },
+        data: { convictionLevel },
+        include: {
+          notes: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+      return this.serializer.toView(company, company.notes);
+    } catch {
+      throw new NotFoundException('Company not found');
+    }
   }
 }

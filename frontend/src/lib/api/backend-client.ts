@@ -1,5 +1,6 @@
 import 'server-only';
 import type { CompanySearchCandidate, CompanyView } from '@/types/company';
+import type { NoteView, TaxonomyView } from '@/types/note';
 
 export class BackendApiError extends Error {
   readonly status: number;
@@ -99,4 +100,74 @@ export async function createCompany(ticker: string): Promise<CompanyView> {
     await throwForFailedResponse(response);
   }
   return (await response.json()) as CompanyView;
+}
+
+export async function getTags(): Promise<TaxonomyView> {
+  const response = await backendFetch('/tags');
+  if (!response.ok) {
+    await throwForFailedResponse(response);
+  }
+  return (await response.json()) as TaxonomyView;
+}
+
+export async function updateCompanyConviction(
+  id: string,
+  convictionLevel: CompanyView['convictionLevel'],
+): Promise<CompanyView> {
+  const response = await backendFetch(`/companies/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ convictionLevel }),
+  });
+  if (!response.ok) {
+    await throwForFailedResponse(response);
+  }
+  return (await response.json()) as CompanyView;
+}
+
+export async function createNote(
+  companyId: string,
+  input: {
+    body: string;
+    moatPattern?: string;
+    businessModel?: string;
+  },
+): Promise<NoteView> {
+  const response = await backendFetch(
+    `/companies/${encodeURIComponent(companyId)}/notes`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) {
+    await throwForFailedResponse(response);
+  }
+  return (await response.json()) as NoteView;
+}
+
+export async function updateNote(
+  noteId: string,
+  input: {
+    body?: string;
+    moatPattern?: string | null;
+    businessModel?: string | null;
+  },
+): Promise<NoteView> {
+  const response = await backendFetch(`/notes/${encodeURIComponent(noteId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    await throwForFailedResponse(response);
+  }
+  return (await response.json()) as NoteView;
+}
+
+export async function deleteNote(noteId: string): Promise<void> {
+  const response = await backendFetch(`/notes/${encodeURIComponent(noteId)}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    await throwForFailedResponse(response);
+  }
 }

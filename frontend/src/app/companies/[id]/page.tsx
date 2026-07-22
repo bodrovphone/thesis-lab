@@ -1,18 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getCompany } from '@/lib/api/backend-client';
+import { CompanyNotebook } from '@/components/company-notebook';
+import { ConvictionSelector } from '@/components/conviction-selector';
+import { getCompany, getTags } from '@/lib/api/backend-client';
 import {
   formatEnrichmentBadge,
   formatMarketCapUsd,
   formatSourceLabel,
-  type ConvictionLevel,
 } from '@/types/company';
-
-const CONVICTION_LABELS: Record<ConvictionLevel, string> = {
-  WATCHING: 'Watching',
-  BUILDING_CONVICTION: 'Building conviction',
-  HIGH_CONVICTION: 'High conviction',
-};
 
 export default async function CompanyDetailPage({
   params,
@@ -20,7 +15,7 @@ export default async function CompanyDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const company = await getCompany(id);
+  const [company, taxonomy] = await Promise.all([getCompany(id), getTags()]);
 
   if (!company) {
     notFound();
@@ -32,6 +27,7 @@ export default async function CompanyDetailPage({
     day: 'numeric',
   });
   const marketCap = formatMarketCapUsd(company.marketCapUsd);
+  const notes = company.notes ?? [];
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 p-8">
@@ -48,11 +44,17 @@ export default async function CompanyDetailPage({
             className="h-12 w-12 rounded-md border border-black/10 object-contain dark:border-white/15"
           />
         )}
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-semibold">{company.ticker}</h1>
           <p className="text-muted text-lg">{company.name}</p>
         </div>
       </div>
+
+      <ConvictionSelector
+        companyId={company.id}
+        value={company.convictionLevel}
+        options={taxonomy.convictionLevels}
+      />
 
       {company.enrichmentStatus !== 'COMPLETE' && (
         <p className="badge-partial w-fit rounded-full px-3 py-1 text-sm">
@@ -110,16 +112,19 @@ export default async function CompanyDetailPage({
           </dd>
         </div>
         <div>
-          <dt className="text-muted">Conviction</dt>
-          <dd>{CONVICTION_LABELS[company.convictionLevel]}</dd>
-        </div>
-        <div>
           <dt className="text-muted">Enrichment status</dt>
           <dd>{company.enrichmentStatus}</dd>
         </div>
       </dl>
 
       <p className="text-muted text-sm">Added {addedDate}</p>
+
+      <CompanyNotebook
+        companyId={company.id}
+        initialNotes={notes}
+        moatPatterns={taxonomy.moatPatterns}
+        businessModels={taxonomy.businessModels}
+      />
     </main>
   );
 }

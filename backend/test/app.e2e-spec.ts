@@ -319,7 +319,10 @@ describe('Companies (e2e)', () => {
       .get(`/companies/${companyId}`)
       .expect(200);
 
-    expect(getResponse.body).toEqual(createResponse.body);
+    expect(getResponse.body).toEqual({
+      ...createResponse.body,
+      notes: [],
+    });
 
     await request(app.getHttpServer())
       .post('/companies')
@@ -481,5 +484,147 @@ describe('Companies (e2e)', () => {
       enrichmentStatus: 'COMPLETE',
       sourcesUsed: ['SEC_EDGAR', 'FINNHUB', 'ALPHA_VANTAGE'],
     });
+  });
+});
+
+describe('Notes and taxonomy (e2e)', () => {
+  let app: INestApplication<App>;
+  let prisma: PrismaService;
+  const originalFetch = global.fetch;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    await app.init();
+    prisma = app.get(PrismaService);
+  });
+
+  afterAll(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    await prisma.note.deleteMany({});
+    await prisma.company.deleteMany({
+      where: { ticker: { in: ['NOTE1'] } },
+    });
+  });
+
+  it('exposes taxonomy labels from GET /tags', async () => {
+    const response = await request(app.getHttpServer()).get('/tags').expect(200);
+
+    expect(response.body.moatPatterns).toEqual(
+      expect.arrayContaining([
+        { value: 'NETWORK_EFFECTS', label: 'Network effects' },
+      ]),
+    );
+    expect(response.body.businessModels).toEqual(
+      expect.arrayContaining([
+        { value: 'B2B_SOFTWARE', label: 'B2B software' },
+      ]),
+    );
+    expect(response.body.convictionLevels).toEqual(
+      expect.arrayContaining([
+        { value: 'WATCHING', label: 'Watching' },
+      ]),
+    );
+  });
+
+  it('supports note CRUD and conviction updates for a company', async () => {
+    const company = await prisma.company.create({
+      data: {
+        ticker: 'NOTE1',
+        name: 'Notes Test Co',
+      },
+    });
+
+    const createNoteResponse = await request(app.getHttpServer())
+      .post(`/companies/${company.id}/notes`)
+      .send({
+        body: '  First observation  ',
+        moatPattern: 'NETWORK_EFFECTS',
+        businessModel: 'B2B_SOFTWARE',
+      })
+      .expect(201);
+
+    expect(createNoteResponse.body).toMatchObject({
+      companyId: company.id,
+      body: 'First observation',
+      moatPattern: 'NETWORK_EFFECTS',
+      businessModel: 'B2B_SOFTWARE',
+    });
+    const noteId = createNoteResponse.body.id as string;
+
+    const listNotesResponse = await request(app.getHttpServer())
+      .get(`/companies/${company.id}/notes`)
+      .expect(200);
+
+    expect(listNotesResponse.body.items).toHaveLength(1);
+
+    const getCompanyResponse = await request(app.getHttpServer())
+      .get(`/companies/${company.id}`)
+      .expect(200);
+
+    expect(getCompanyResponse.body.notes).toHaveLength(1);
+
+    const updateNoteResponse = await request(app.getHttpServer())
+      .patch(`/notes/${noteId}`)
+      .send({
+        body: 'Updated observation',
+        moatPattern: null,
+      })
+      .expect(200);
+
+    expect(updateNoteResponse.body).toMatchObject({
+      body: 'Updated observation',
+      moatPattern: null,
+      businessModel: 'B2B_SOFTWARE',
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/companies/${company.id}`)
+      .send({ convictionLevel: 'HIGH_CONVICTION' })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.convictionLevel).toBe('HIGH_CONVICTION');
+      });
+
+    await request(app.getHttpServer()).delete(`/notes/${noteId}`).expect(204);
+
+    const afterDelete = await request(app.getHttpServer())
+      .get(`/companies/${company.id}/notes`)
+      .expect(200);
+
+    expect(afterDelete.body.items).toEqual([]);
+  });
+
+  it('rejects empty note bodies and invalid enum values', async () => {
+    const company = await prisma.company.create({
+      data: {
+        ticker: 'NOTE1',
+        name: 'Notes Test Co',
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/companies/${company.id}/notes`)
+      .send({ body: '   ' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(`/companies/${company.id}/notes`)
+      .send({ body: 'Valid', moatPattern: 'NOT_A_MOAT' })
+      .expect(400);
   });
 });

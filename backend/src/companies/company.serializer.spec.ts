@@ -1,4 +1,5 @@
-import type { Company } from '../generated/prisma/client';
+import type { Company, Note } from '../generated/prisma/client';
+import { NoteSerializer } from '../notes/note.serializer';
 import { CompanySerializer } from './company.serializer';
 
 function makeCompany(overrides: Partial<Company> = {}): Company {
@@ -27,9 +28,26 @@ function makeCompany(overrides: Partial<Company> = {}): Company {
   };
 }
 
+function makeNote(overrides: Partial<Note> = {}): Note {
+  return {
+    id: 'n1',
+    companyId: 'c1',
+    body: 'Strong network effects',
+    moatPattern: 'NETWORK_EFFECTS',
+    businessModel: 'B2B_SOFTWARE',
+    aiSuggestedMoatPattern: null,
+    aiSuggestedBusinessModel: null,
+    tagEditedByUser: null,
+    createdAt: new Date('2026-07-22T02:00:00.000Z'),
+    updatedAt: new Date('2026-07-22T02:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 describe('CompanySerializer', () => {
+  const serializer = new CompanySerializer(new NoteSerializer());
+
   it('serializes BigInt marketCapUsd to a decimal string', () => {
-    const serializer = new CompanySerializer();
     const view = serializer.toView(
       makeCompany({ marketCapUsd: 3_000_000_000_000n }),
     );
@@ -38,7 +56,6 @@ describe('CompanySerializer', () => {
   });
 
   it('serializes Date fields to ISO 8601 strings', () => {
-    const serializer = new CompanySerializer();
     const view = serializer.toView(makeCompany());
 
     expect(view.createdAt).toBe('2026-07-22T00:00:00.000Z');
@@ -47,7 +64,6 @@ describe('CompanySerializer', () => {
   });
 
   it('passes through null optional fields as null', () => {
-    const serializer = new CompanySerializer();
     const view = serializer.toView(
       makeCompany({
         marketCapUsd: null,
@@ -61,8 +77,23 @@ describe('CompanySerializer', () => {
     expect(view.summaryGeneratedAt).toBeNull();
   });
 
+  it('includes notes when provided', () => {
+    const view = serializer.toView(makeCompany(), [makeNote()]);
+
+    expect(view.notes).toEqual([
+      {
+        id: 'n1',
+        companyId: 'c1',
+        body: 'Strong network effects',
+        moatPattern: 'NETWORK_EFFECTS',
+        businessModel: 'B2B_SOFTWARE',
+        createdAt: '2026-07-22T02:00:00.000Z',
+        updatedAt: '2026-07-22T02:00:00.000Z',
+      },
+    ]);
+  });
+
   it('never leaks the underlying Prisma entity shape untransformed', () => {
-    const serializer = new CompanySerializer();
     const company = makeCompany({ marketCapUsd: 42n });
     const view = serializer.toView(company);
 

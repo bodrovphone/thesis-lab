@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { Company } from '../generated/prisma/client';
+import type { Company, Note } from '../generated/prisma/client';
+import { NoteSerializer } from '../notes/note.serializer';
 import type { CompanyViewDto } from './dto/company-view.dto';
 
 @Injectable()
 export class CompanySerializer {
-  toView(company: Company): CompanyViewDto {
+  constructor(private readonly noteSerializer: NoteSerializer) {}
+
+  toView(company: Company, notes?: Note[]): CompanyViewDto {
     return {
       id: company.id,
       ticker: company.ticker,
@@ -31,6 +34,9 @@ export class CompanySerializer {
         : null,
       createdAt: company.createdAt.toISOString(),
       updatedAt: company.updatedAt.toISOString(),
+      ...(notes !== undefined
+        ? { notes: notes.map((note) => this.noteSerializer.toView(note)) }
+        : {}),
     };
   }
 }

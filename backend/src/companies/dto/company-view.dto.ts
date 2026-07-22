@@ -3,6 +3,7 @@ import type {
   DataSource,
   EnrichmentStatus,
 } from '../../generated/prisma/client';
+import type { NoteViewDto } from '../../notes/dto/note-view.dto';
 
 export interface CompanyViewDto {
   id: string;
@@ -25,4 +26,5 @@ export interface CompanyViewDto {
   summaryGeneratedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  notes?: NoteViewDto[];
 }

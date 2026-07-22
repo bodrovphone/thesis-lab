@@ -1,3 +1,5 @@
+import type { NoteView } from './note';
+
 export type ConvictionLevel =
   | 'WATCHING'
   | 'BUILDING_CONVICTION'
@@ -28,6 +30,7 @@ export interface CompanyView {
   summaryGeneratedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  notes?: NoteView[];
 }
 
 export interface CompanySearchCandidate {

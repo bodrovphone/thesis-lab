@@ -1,0 +1,89 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  BackendApiError,
+  deleteNote,
+  isForwardableBackendStatus,
+  updateNote,
+} from '@/lib/api/backend-client';
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+
+  let payload: {
+    body?: unknown;
+    moatPattern?: unknown;
+    businessModel?: unknown;
+  };
+  try {
+    payload = (await request.json()) as {
+      body?: unknown;
+      moatPattern?: unknown;
+      businessModel?: unknown;
+    };
+  } catch {
+    return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
+  }
+
+  const input: {
+    body?: string;
+    moatPattern?: string | null;
+    businessModel?: string | null;
+  } = {};
+
+  if (payload.body !== undefined) {
+    if (typeof payload.body !== 'string') {
+      return NextResponse.json({ message: 'Invalid body' }, { status: 400 });
+    }
+    input.body = payload.body;
+  }
+
+  if (payload.moatPattern !== undefined) {
+    if (payload.moatPattern !== null && typeof payload.moatPattern !== 'string') {
+      return NextResponse.json({ message: 'Invalid moatPattern' }, { status: 400 });
+    }
+    input.moatPattern = payload.moatPattern;
+  }
+
+  if (payload.businessModel !== undefined) {
+    if (payload.businessModel !== null && typeof payload.businessModel !== 'string') {
+      return NextResponse.json({ message: 'Invalid businessModel' }, { status: 400 });
+    }
+    input.businessModel = payload.businessModel;
+  }
+
+  try {
+    const note = await updateNote(id, input);
+    return NextResponse.json(note);
+  } catch (error) {
+    if (error instanceof BackendApiError && isForwardableBackendStatus(error.status)) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+    return NextResponse.json(
+      { message: 'Backend service unavailable' },
+      { status: 502 },
+    );
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+
+  try {
+    await deleteNote(id);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    if (error instanceof BackendApiError && isForwardableBackendStatus(error.status)) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
+    return NextResponse.json(
+      { message: 'Backend service unavailable' },
+      { status: 502 },
+    );
+  }
+}

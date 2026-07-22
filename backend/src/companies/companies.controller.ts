@@ -1,11 +1,12 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
   NotFoundException,
   Param,
+  Patch,
   Post,
-  Body,
   Query,
 } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
@@ -13,6 +14,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { SearchExternalQueryDto } from './dto/search-external-query.dto';
 import type { SearchCandidateDto } from './dto/search-candidate.dto';
 import type { CompanyViewDto } from './dto/company-view.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
 
 @Controller('companies')
 export class CompaniesController {
@@ -48,5 +50,13 @@ export class CompaniesController {
       throw new NotFoundException('Company not found');
     }
     return company;
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCompanyDto,
+  ): Promise<CompanyViewDto> {
+    return this.companiesService.updateConviction(id, dto.convictionLevel);
   }
 }
