@@ -40,7 +40,7 @@ Entries accumulate for the file's whole lifetime — never delete old entries wh
 
 ## How to advance a task one stage (the "advance-task" procedure)
 
-This is the procedure any LLM coding agent should follow when asked to advance/promote/elevate a task file to the next pipeline stage. Claude Code additionally exposes this as an installable skill at `.claude/skills/advance-task/SKILL.md`, but the procedure itself is defined here and works from this file alone — no tool-specific mechanism is required to follow it.
+This is the procedure any LLM coding agent should follow when asked to advance/promote/elevate a task file to the next pipeline stage. Claude Code and Codex expose it through thin discovery adapters at `.claude/skills/advance-task/SKILL.md` and `.agents/skills/advance-task/SKILL.md`, respectively. Those adapters must point here rather than duplicate the transition logic; this file remains authoritative and works without any tool-specific mechanism.
 
 **Only two transitions go through this procedure**: `01-ideas → 02-specs` and `02-specs → 03-ready`. The third transition, `03-ready → 04-shipped`, is deliberately NOT part of this procedure or the sign-off gate — it happens only after the task has actually been implemented (a normal build/coding session), at which point a human or agent manually moves the file and appends the `## Outcome` section.
 
