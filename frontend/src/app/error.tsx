@@ -15,8 +15,9 @@ export default function Error({
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-start justify-center gap-4 p-8">
-      <h1 className="text-2xl font-semibold">Something went wrong</h1>
-      <p className="text-muted">We couldn&apos;t load this page. Please try again.</p>
+      <p className="eyebrow">Connection interrupted</p>
+      <h1 className="text-2xl font-semibold">The research desk needs a retry</h1>
+      <p className="text-muted">We couldn&apos;t load this page. Your saved research is still safe.</p>
       <button
         type="button"
         onClick={() => unstable_retry()}

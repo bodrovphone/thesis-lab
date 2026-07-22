@@ -39,6 +39,11 @@ export class CompaniesController {
     return this.companiesService.create(dto.ticker);
   }
 
+  @Post(':id/refresh-enrichment')
+  refreshEnrichment(@Param('id') id: string): Promise<CompanyViewDto> {
+    return this.companiesService.refreshEnrichment(id);
+  }
+
   @Get()
   async findAll(
     @Query() query: ListCompaniesQueryDto,

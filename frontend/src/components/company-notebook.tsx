@@ -72,6 +72,8 @@ export function CompanyNotebook({
   );
 
   useEffect(() => {
+    // The server refresh can replace the initial notes after a mutation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotes(initialNotes);
   }, [initialNotes]);
 
@@ -241,6 +243,10 @@ export function CompanyNotebook({
 
   async function handleDelete(noteId: string) {
     if (deletingNoteId) {
+      return;
+    }
+
+    if (!window.confirm('Delete this research note? This cannot be undone.')) {
       return;
     }
 

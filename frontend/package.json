@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.22",
+    "@astryxdesign/core": "^0.1.7",
+    "@astryxdesign/theme-neutral": "^0.1.7",
     "ai": "^7.0.35",
     "next": "16.2.11",
     "react": "19.2.8",
@@ -25,6 +27,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
-    "typescript": "7.0.2"
+    "typescript": "^5.9.3"
   }
 }

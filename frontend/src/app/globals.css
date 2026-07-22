@@ -1,11 +1,19 @@
-@import "tailwindcss";
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import '@astryxdesign/core/reset.css';
+@import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
+@import '@astryxdesign/core/tailwind-theme.css';
+@import 'tailwindcss/utilities.css' layer(utilities);
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --muted-foreground: #6b7280;
-  --badge-partial-bg: #fef3c7;
-  --badge-partial-fg: #92400e;
+  --background: #f5f2ea;
+  --foreground: #1d2b2a;
+  --muted-foreground: #66716f;
+  --badge-partial-bg: #f8e9c8;
+  --badge-partial-fg: #80521c;
+  --accent: #0e6b62;
 }
 
 @theme inline {
@@ -17,18 +25,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #14201f;
+    --foreground: #edf2ec;
     --muted-foreground: #9ca3af;
-    --badge-partial-bg: #451a03;
-    --badge-partial-fg: #fde68a;
+    --badge-partial-bg: #4b3716;
+    --badge-partial-fg: #f7d98c;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+  background-image: radial-gradient(circle at 12% 0%, rgb(255 255 255 / 0.7), transparent 28rem), linear-gradient(120deg, transparent 0 48%, rgb(14 107 98 / 0.035) 48% 52%, transparent 52%);
 }
 
 .text-muted {
@@ -39,3 +48,13 @@ body {
   background: var(--badge-partial-bg);
   color: var(--badge-partial-fg);
 }
+
+.research-shell { position: relative; isolation: isolate; }
+.research-shell::before { position: absolute; z-index: -1; top: 1.5rem; right: -4rem; width: 13rem; height: 13rem; border: 1px solid rgb(14 107 98 / 0.14); border-radius: 999px; content: ''; }
+.research-shell::after { position: absolute; z-index: -1; top: 7rem; right: 1rem; width: 8rem; height: 8rem; border: 1px solid rgb(14 107 98 / 0.1); border-radius: 999px; content: ''; }
+.status-pulse { animation: status-pulse 2.4s ease-in-out infinite; }
+.eyebrow { color: var(--accent); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; line-height: 1; text-transform: uppercase; }
+.activity-dot-teal { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.activity-dot-ink { background: #66716f; box-shadow: 0 0 0 4px rgb(102 113 111 / 0.14); }
+.activity-dot-gold { background: #b6812b; box-shadow: 0 0 0 4px rgb(182 129 43 / 0.14); }
+@keyframes status-pulse { 0%, 100% { opacity: 0.6; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1); } }

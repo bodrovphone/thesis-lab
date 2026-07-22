@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CompanyNotebook } from '@/components/company-notebook';
+import { ActivityFeed } from '@/components/activity-feed';
 import { ConvictionSelector } from '@/components/conviction-selector';
 import { CurrentThinkingPanel } from '@/components/current-thinking-panel';
+import { EnrichmentStatus } from '@/components/enrichment-status';
 import { getCompany, getTags } from '@/lib/api/backend-client';
 import {
-  formatEnrichmentBadge,
   formatMarketCapUsd,
   formatSourceLabel,
 } from '@/types/company';
@@ -31,12 +32,12 @@ export default async function CompanyDetailPage({
   const notes = company.notes ?? [];
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 p-8">
+    <main className="research-shell mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-12">
       <Link href="/" className="text-muted w-fit text-sm hover:underline">
         ← Back to dashboard
       </Link>
 
-      <div className="flex items-start gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-6 border-b border-black/10 pb-8 dark:border-white/10"><div className="flex items-start gap-4">
         {company.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -49,7 +50,7 @@ export default async function CompanyDetailPage({
           <h1 className="text-3xl font-semibold">{company.ticker}</h1>
           <p className="text-muted text-lg">{company.name}</p>
         </div>
-      </div>
+        </div><div className="flex items-center gap-2 text-xs text-muted"><span className="h-2 w-2 rounded-full bg-[var(--accent)]" /> Research record</div></div>
 
       <ConvictionSelector
         companyId={company.id}
@@ -57,11 +58,7 @@ export default async function CompanyDetailPage({
         options={taxonomy.convictionLevels}
       />
 
-      {company.enrichmentStatus !== 'COMPLETE' && (
-        <p className="badge-partial w-fit rounded-full px-3 py-1 text-sm">
-          {formatEnrichmentBadge(company.enrichmentStatus)}
-        </p>
-      )}
+      <EnrichmentStatus companyId={company.id} status={company.enrichmentStatus} />
 
       <div className="flex flex-wrap gap-2">
         {company.sourcesUsed.map((source) => (
@@ -120,19 +117,7 @@ export default async function CompanyDetailPage({
 
       <p className="text-muted text-sm">Added {addedDate}</p>
 
-      <CurrentThinkingPanel
-        companyId={company.id}
-        noteCount={notes.length}
-        initialSummary={company.currentThinkingSummary}
-        initialGeneratedAt={company.summaryGeneratedAt}
-      />
-
-      <CompanyNotebook
-        companyId={company.id}
-        initialNotes={notes}
-        moatPatterns={taxonomy.moatPatterns}
-        businessModels={taxonomy.businessModels}
-      />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]"><div className="flex min-w-0 flex-col gap-8"><CurrentThinkingPanel companyId={company.id} noteCount={notes.length} initialSummary={company.currentThinkingSummary} initialGeneratedAt={company.summaryGeneratedAt} /><CompanyNotebook companyId={company.id} initialNotes={notes} moatPatterns={taxonomy.moatPatterns} businessModels={taxonomy.businessModels} /></div><ActivityFeed company={company} /></div>
     </main>
   );
 }

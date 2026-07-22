@@ -170,6 +170,12 @@ export async function updateCompanySummary(
   return (await response.json()) as CompanyView;
 }
 
+export async function refreshCompanyEnrichment(id: string): Promise<CompanyView> {
+  const response = await backendFetch(`/companies/${encodeURIComponent(id)}/refresh-enrichment`, { method: 'POST' });
+  if (!response.ok) await throwForFailedResponse(response);
+  return (await response.json()) as CompanyView;
+}
+
 export async function createNote(
   companyId: string,
   input: {

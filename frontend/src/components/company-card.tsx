@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Badge } from '@astryxdesign/core/Badge';
 import {
   formatEnrichmentBadge,
   formatMarketCapUsd,
@@ -17,10 +18,10 @@ export function CompanyCard({ company }: { company: CompanyView }) {
   return (
     <Link
       href={`/companies/${company.id}`}
-      className="block rounded-lg border border-black/10 p-4 transition-colors hover:border-black/30 dark:border-white/15 dark:hover:border-white/30"
+      className="block rounded-2xl border border-black/10 bg-white/70 p-5 shadow-[0_12px_30px_rgb(34_53_47/0.05)] transition duration-200 hover:-translate-y-1 hover:border-[var(--accent)]/50 hover:shadow-[0_18px_40px_rgb(34_53_47/0.1)] dark:border-white/15 dark:bg-white/[0.04]"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-lg font-semibold">{company.ticker}</span>
+        <span className="text-xl font-semibold tracking-tight">{company.ticker}</span>
         {company.exchange && (
           <span className="text-muted text-sm">{company.exchange}</span>
         )}
@@ -32,13 +33,9 @@ export function CompanyCard({ company }: { company: CompanyView }) {
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/15">
-          {CONVICTION_LABELS[company.convictionLevel]}
-        </span>
+        <Badge variant="neutral" label={CONVICTION_LABELS[company.convictionLevel]} />
         {company.enrichmentStatus !== 'COMPLETE' && (
-          <span className="badge-partial rounded-full px-2 py-0.5">
-            {formatEnrichmentBadge(company.enrichmentStatus)}
-          </span>
+          <Badge variant={company.enrichmentStatus === 'FAILED' ? 'error' : 'warning'} label={formatEnrichmentBadge(company.enrichmentStatus)} />
         )}
       </div>
     </Link>

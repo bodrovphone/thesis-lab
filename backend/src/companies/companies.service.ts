@@ -135,6 +135,44 @@ export class CompaniesService {
       : null;
   }
 
+  async refreshEnrichment(id: string): Promise<CompanyViewDto> {
+    const existing = await this.prisma.company.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Company not found');
+    }
+
+    const candidate = await this.aggregator.resolveCandidate(existing.ticker);
+    if (!candidate) {
+      throw new NotFoundException('Ticker not found in company sources');
+    }
+
+    const merged = mergeCompanyProfile(
+      candidate,
+      await this.aggregator.fetchProfiles(candidate),
+      new Date(),
+    );
+    const company = await this.prisma.company.update({
+      where: { id },
+      data: {
+        name: merged.name,
+        cik: merged.cik,
+        exchange: merged.exchange,
+        sector: merged.sector,
+        industry: merged.industry,
+        description: merged.description,
+        country: merged.country,
+        marketCapUsd: merged.marketCapUsd,
+        website: merged.website,
+        logoUrl: merged.logoUrl,
+        sourcesUsed: merged.sourcesUsed.map((source) => DataSource[source]),
+        enrichmentStatus: merged.enrichmentStatus,
+        lastEnrichedAt: merged.lastEnrichedAt,
+      },
+      include: { notes: { orderBy: { createdAt: 'desc' } } },
+    });
+    return this.serializer.toView(company, company.notes);
+  }
+
   async updateConviction(
     id: string,
     convictionLevel: ConvictionLevel,
