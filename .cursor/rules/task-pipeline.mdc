@@ -1,0 +1,13 @@
+---
+description: thesis-lab 4-stage task pipeline — read AGENTS.md before touching task files
+alwaysApply: true
+---
+
+# Task pipeline
+
+This repo uses a 4-stage pipeline (`01-ideas/` → `02-specs/` → `03-ready/` → `04-shipped/`). The tool-agnostic source of truth is `AGENTS.md` — read it before creating, advancing, or shipping a task.
+
+Cursor-specific notes:
+- `01-ideas → 02-specs` and `02-specs → 03-ready` go through the `advance-task` skill (`.cursor/skills/advance-task/SKILL.md`), which delegates to `AGENTS.md`.
+- `03-ready → 04-shipped` is never a skill call — only move a file there after it has been implemented and verified, appending an `## Outcome` section.
+- A file only moves from `01-ideas`/`02-specs` once **two different models** have signed off on that transition — never move on a single model's say-so, and never let the same model fill both sign-off slots.

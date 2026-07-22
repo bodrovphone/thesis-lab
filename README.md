@@ -15,14 +15,15 @@ The authoritative workflow, frontmatter convention, and two-model sign-off gate 
 
 ## Agent support
 
-Claude Code and Codex expose the same `advance-task` workflow through thin, repository-scoped adapters:
+Claude Code, Codex, and Cursor expose the same `advance-task` workflow through thin, repository-scoped adapters:
 
 - Claude Code: `.claude/skills/advance-task/SKILL.md`
 - Codex: `.agents/skills/advance-task/SKILL.md`
+- Cursor: `.cursor/skills/advance-task/SKILL.md`
 
-In Claude Code, invoke `/advance-task <task-path>`. In Codex, ask it to advance the named task or explicitly mention `$advance-task`.
+In Claude Code, invoke `/advance-task <task-path>`. In Codex, ask it to advance the named task or explicitly mention `$advance-task`. In Cursor, ask to advance/promote the named task (the project skill is auto-discovered), or `@` the skill if you want to force it.
 
-Both adapters delegate to `AGENTS.md`; neither defines its own transition rules. A future agent integration should follow the same pattern so the pipeline remains tool-agnostic.
+All three adapters delegate to `AGENTS.md`; none define their own transition rules. Cursor also has always-apply / path-scoped rules under `.cursor/rules/` that point at the same pipeline without duplicating procedure.
 
 ## Sign-off rule
 

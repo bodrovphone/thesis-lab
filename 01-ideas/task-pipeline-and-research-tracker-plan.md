@@ -2,10 +2,13 @@
 title: Task Pipeline + Mini Research Tracker Plan
 domain: [backend, frontend, infra]
 stage: ideas
+pipeline_role: reference
 created: 2026-07-22
 ---
 
 # thesis-lab: Task Pipeline + Mini Research Tracker
+
+> **Reference only — not an actively-advancing task.** This is a whole-project planning doc, not a single shippable unit of work; it is exempt from the `advance-task` procedure (see `AGENTS.md` → "Reference-only files"). The actual pipeline tasks for this build are `01-ideas/01-monorepo-scaffold.md` through `09-polish.md`.
 
 ## Sign-offs
 

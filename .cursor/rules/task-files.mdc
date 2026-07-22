@@ -1,0 +1,14 @@
+---
+description: Conventions for pipeline task markdown files (frontmatter, sign-offs, stage folders)
+globs: "{01-ideas,02-specs,03-ready,04-shipped}/**/*.md"
+alwaysApply: false
+---
+
+# Task file conventions
+
+When editing files under `01-ideas/`, `02-specs/`, `03-ready/`, or `04-shipped/`:
+
+- Keep YAML frontmatter in sync: `title`, `domain`, `stage`, `created`. `stage` must match the folder.
+- Preserve the `## Sign-offs` section (immediately after the title). Never delete old sign-off lines.
+- Do not invent file moves between stages outside the `advance-task` procedure in `AGENTS.md` (ideas→specs, specs→ready) or a post-implementation ship to `04-shipped/` with `## Outcome`.
+- Stop short of implementation detail in `02-specs/`; put concrete paths/schemas/verification in `03-ready/`.

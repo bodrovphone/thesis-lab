@@ -20,7 +20,7 @@ No `.codex/config.toml`, model selection, sandbox policy, hooks, or MCP configur
 2. The tool discovers its repository-scoped `advance-task` skill.
 3. The skill directs the agent to `AGENTS.md`.
 4. The agent applies the same transition and sign-off rules regardless of tool.
-5. A future Cursor adapter can point to the same `AGENTS.md` procedure without changing the core workflow.
+5. A future Cursor adapter can point to the same `AGENTS.md` procedure without changing the core workflow. **Done:** see `2026-07-22-cursor-parity-design.md` (`.cursor/skills/advance-task/` + `.cursor/rules/`).
 
 ## Verification
 

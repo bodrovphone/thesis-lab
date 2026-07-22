@@ -2,10 +2,13 @@
 title: Mini Research Tracker
 domain: [backend, frontend, infra]
 stage: specs
+pipeline_role: reference
 created: 2026-07-22
 ---
 
 # Mini Research Tracker
+
+> **Reference only — not an actively-advancing task.** This whole-project architecture spec is exempt from the `advance-task` procedure (see `AGENTS.md` → "Reference-only files") — it does not itself continue to `03-ready`/`04-shipped`. The actual pipeline tasks are `01-ideas/01-monorepo-scaffold.md` through `09-polish.md`, each of which cites this doc as its architecture authority.
 
 ## Sign-offs
 
