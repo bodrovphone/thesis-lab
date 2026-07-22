@@ -8,6 +8,7 @@ import type {
 } from './types/company-data.types';
 import { SecEdgarAdapter } from './sec-edgar/sec-edgar.adapter';
 import { FinnhubAdapter } from './finnhub/finnhub.adapter';
+import { AlphaVantageAdapter } from './alpha-vantage/alpha-vantage.adapter';
 
 const SOURCE_ORDER: DataSourceName[] = ['SEC_EDGAR', 'FINNHUB'];
 
@@ -124,12 +125,15 @@ function mergeResolvedCandidates(
 @Injectable()
 export class CompanyDataAggregatorService implements CompanyDataAggregator {
   private readonly adapters: [SecEdgarAdapter, FinnhubAdapter];
+  private readonly alphaVantageAdapter: AlphaVantageAdapter;
 
   constructor(
     secEdgarAdapter: SecEdgarAdapter,
     finnhubAdapter: FinnhubAdapter,
+    alphaVantageAdapter: AlphaVantageAdapter,
   ) {
     this.adapters = [secEdgarAdapter, finnhubAdapter];
+    this.alphaVantageAdapter = alphaVantageAdapter;
   }
 
   async searchCandidates(
@@ -206,14 +210,17 @@ export class CompanyDataAggregatorService implements CompanyDataAggregator {
   async fetchProfiles(
     candidate: CompanySearchCandidate,
   ): Promise<AdapterResult<NormalizedCompanyProfile>[]> {
-    const [secOutcome, finnhubOutcome] = await Promise.allSettled([
-      this.adapters[0].fetchProfile(candidate),
-      this.adapters[1].fetchProfile(candidate),
-    ]);
+    const [secOutcome, finnhubOutcome, alphaVantageOutcome] =
+      await Promise.allSettled([
+        this.adapters[0].fetchProfile(candidate),
+        this.adapters[1].fetchProfile(candidate),
+        this.alphaVantageAdapter.fetchProfile(candidate),
+      ]);
 
     return [
       settledToResult('SEC_EDGAR', secOutcome),
       settledToResult('FINNHUB', finnhubOutcome),
+      settledToResult('ALPHA_VANTAGE', alphaVantageOutcome),
     ];
   }
 }

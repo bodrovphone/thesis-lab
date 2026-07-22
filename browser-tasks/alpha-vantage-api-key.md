@@ -1,6 +1,8 @@
 ---
 title: Obtain Alpha Vantage API key
 created: 2026-07-23
+status: done
+completed: 2026-07-23
 ---
 
 # Obtain Alpha Vantage API key
@@ -21,3 +23,8 @@ Standalone browser task — not part of the task pipeline (see `browser-tasks/RE
 ## Notes
 - Free tier: 25 requests/day — a hard cap, so this key is only used for on-demand "add company" enrichment, never for search-as-you-type.
 - No credit card required.
+
+## Outcome
+- Requested a free Alpha Vantage API key using the project email.
+- Added `ALPHA_VANTAGE_API_KEY` to untracked `backend/.env`.
+- Enabled `ENABLE_ALPHA_VANTAGE` in untracked `backend/.env`.

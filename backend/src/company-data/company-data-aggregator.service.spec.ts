@@ -6,7 +6,7 @@ import {
 import type { CompanySearchCandidate } from './types/company-data.types';
 import { ServiceUnavailableException } from '@nestjs/common';
 
-function makeAdapter(source: 'SEC_EDGAR' | 'FINNHUB') {
+function makeAdapter(source: 'SEC_EDGAR' | 'FINNHUB' | 'ALPHA_VANTAGE') {
   return {
     source,
     search: jest.fn(),
@@ -110,6 +110,7 @@ describe('CompanyDataAggregatorService', () => {
     const aggregator = new CompanyDataAggregatorService(
       sec as never,
       finnhub as never,
+      makeAdapter('ALPHA_VANTAGE') as never,
     );
 
     await expect(aggregator.searchCandidates('apple', 5)).resolves.toEqual([
@@ -148,6 +149,7 @@ describe('CompanyDataAggregatorService', () => {
     const aggregator = new CompanyDataAggregatorService(
       sec as never,
       finnhub as never,
+      makeAdapter('ALPHA_VANTAGE') as never,
     );
 
     const results = await aggregator.searchCandidates('apple', 5);
@@ -172,6 +174,7 @@ describe('CompanyDataAggregatorService', () => {
     const aggregator = new CompanyDataAggregatorService(
       sec as never,
       finnhub as never,
+      makeAdapter('ALPHA_VANTAGE') as never,
     );
 
     await expect(
@@ -196,6 +199,7 @@ describe('CompanyDataAggregatorService', () => {
     const aggregator = new CompanyDataAggregatorService(
       sec as never,
       finnhub as never,
+      makeAdapter('ALPHA_VANTAGE') as never,
     );
 
     await expect(aggregator.resolveCandidate('FOOONLY')).rejects.toBeInstanceOf(
@@ -203,9 +207,10 @@ describe('CompanyDataAggregatorService', () => {
     );
   });
 
-  it('fetchProfiles returns both adapter results in source order', async () => {
+  it('fetchProfiles returns adapter results in source order including Alpha Vantage', async () => {
     const sec = makeAdapter('SEC_EDGAR');
     const finnhub = makeAdapter('FINNHUB');
+    const alphaVantage = makeAdapter('ALPHA_VANTAGE');
     const candidate: CompanySearchCandidate = {
       ticker: 'AAPL',
       name: 'Apple Inc.',
@@ -221,7 +226,9 @@ describe('CompanyDataAggregatorService', () => {
         name: 'Apple Inc.',
         cik: '0000320193',
         exchange: 'Nasdaq',
+        sector: null,
         industry: 'Electronic Computers',
+        description: null,
         country: null,
         marketCapUsd: null,
         website: null,
@@ -233,16 +240,23 @@ describe('CompanyDataAggregatorService', () => {
       status: 'timeout',
       message: 'Finnhub request timed out',
     });
+    alphaVantage.fetchProfile.mockResolvedValue({
+      source: 'ALPHA_VANTAGE',
+      status: 'disabled',
+      message: 'Alpha Vantage adapter is disabled',
+    });
 
     const aggregator = new CompanyDataAggregatorService(
       sec as never,
       finnhub as never,
+      alphaVantage as never,
     );
 
     const results = await aggregator.fetchProfiles(candidate);
     expect(results.map((result) => result.source)).toEqual([
       'SEC_EDGAR',
       'FINNHUB',
+      'ALPHA_VANTAGE',
     ]);
   });
 });

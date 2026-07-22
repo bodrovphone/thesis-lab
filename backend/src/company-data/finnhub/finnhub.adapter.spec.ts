@@ -72,7 +72,9 @@ describe('parseFinnhubProfile2Payload', () => {
     ).toMatchObject({
       ticker: 'AAPL',
       name: 'Apple Inc',
+      sector: null,
       industry: 'Technology',
+      description: null,
       country: 'US',
       marketCapUsd: 3_000_000_000_000n,
       website: 'https://apple.com',

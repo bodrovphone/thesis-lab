@@ -18,7 +18,9 @@ const secProfile: NormalizedCompanyProfile = {
   name: 'Apple Inc.',
   cik: '0000320193',
   exchange: 'Nasdaq',
+  sector: null,
   industry: 'Electronic Computers',
+  description: null,
   country: null,
   marketCapUsd: null,
   website: null,
@@ -30,12 +32,28 @@ const finnhubProfile: NormalizedCompanyProfile = {
   name: 'Apple Inc',
   cik: null,
   exchange: 'NASDAQ',
+  sector: null,
   industry: 'Technology',
+  description: null,
   country: 'US',
   marketCapUsd: 3_000_000_000_000n,
   website: 'https://apple.com',
   logoUrl:
     'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/AAPL.png',
+};
+
+const alphaVantageProfile: NormalizedCompanyProfile = {
+  ticker: 'AAPL',
+  name: 'Apple Inc',
+  cik: null,
+  exchange: 'NASDAQ',
+  sector: 'TECHNOLOGY',
+  industry: 'CONSUMER ELECTRONICS',
+  description: 'Designs consumer electronics.',
+  country: 'USA',
+  marketCapUsd: 2_900_000_000_000n,
+  website: null,
+  logoUrl: null,
 };
 
 const now = new Date('2026-07-23T00:00:00.000Z');
@@ -52,7 +70,9 @@ describe('mergeCompanyProfile', () => {
       name: 'Apple Inc',
       cik: '0000320193',
       exchange: 'NASDAQ',
+      sector: null,
       industry: 'Technology',
+      description: null,
       country: 'US',
       marketCapUsd: 3_000_000_000_000n,
       website: 'https://apple.com',
@@ -60,6 +80,42 @@ describe('mergeCompanyProfile', () => {
       sourcesUsed: ['SEC_EDGAR', 'FINNHUB'],
       enrichmentStatus: 'COMPLETE',
       lastEnrichedAt: now,
+    });
+  });
+
+  it('prefers Alpha Vantage description, sector, and industry when present', () => {
+    const results: AdapterResult<NormalizedCompanyProfile>[] = [
+      { source: 'SEC_EDGAR', status: 'ok', data: secProfile },
+      { source: 'FINNHUB', status: 'ok', data: finnhubProfile },
+      { source: 'ALPHA_VANTAGE', status: 'ok', data: alphaVantageProfile },
+    ];
+
+    expect(mergeCompanyProfile(candidate, results, now)).toMatchObject({
+      sector: 'TECHNOLOGY',
+      industry: 'CONSUMER ELECTRONICS',
+      description: 'Designs consumer electronics.',
+      country: 'US',
+      marketCapUsd: 3_000_000_000_000n,
+      sourcesUsed: ['SEC_EDGAR', 'FINNHUB', 'ALPHA_VANTAGE'],
+      enrichmentStatus: 'COMPLETE',
+    });
+  });
+
+  it('keeps COMPLETE enrichment when Alpha Vantage fails but core sources succeed', () => {
+    const results: AdapterResult<NormalizedCompanyProfile>[] = [
+      { source: 'SEC_EDGAR', status: 'ok', data: secProfile },
+      { source: 'FINNHUB', status: 'ok', data: finnhubProfile },
+      {
+        source: 'ALPHA_VANTAGE',
+        status: 'rate_limited',
+        message: 'Alpha Vantage daily budget exhausted',
+      },
+    ];
+
+    expect(mergeCompanyProfile(candidate, results, now)).toMatchObject({
+      enrichmentStatus: 'COMPLETE',
+      sourcesUsed: ['SEC_EDGAR', 'FINNHUB'],
+      description: null,
     });
   });
 
@@ -120,7 +176,7 @@ describe('mergeCompanyProfile', () => {
     });
   });
 
-  it('returns FAILED when both profiles fail', () => {
+  it('returns PARTIAL Alpha Vantage data when core sources fail', () => {
     const results: AdapterResult<NormalizedCompanyProfile>[] = [
       {
         source: 'SEC_EDGAR',
@@ -128,6 +184,33 @@ describe('mergeCompanyProfile', () => {
         message: 'SEC request timed out',
       },
       { source: 'FINNHUB', status: 'error', message: 'Finnhub request failed' },
+      { source: 'ALPHA_VANTAGE', status: 'ok', data: alphaVantageProfile },
+    ];
+
+    expect(mergeCompanyProfile(candidate, results, now)).toMatchObject({
+      ticker: 'AAPL',
+      name: 'Apple Inc',
+      cik: '0000320193',
+      sector: 'TECHNOLOGY',
+      description: 'Designs consumer electronics.',
+      enrichmentStatus: 'PARTIAL',
+      sourcesUsed: ['SEC_EDGAR', 'FINNHUB', 'ALPHA_VANTAGE'],
+    });
+  });
+
+  it('returns FAILED when all profiles fail', () => {
+    const results: AdapterResult<NormalizedCompanyProfile>[] = [
+      {
+        source: 'SEC_EDGAR',
+        status: 'timeout',
+        message: 'SEC request timed out',
+      },
+      { source: 'FINNHUB', status: 'error', message: 'Finnhub request failed' },
+      {
+        source: 'ALPHA_VANTAGE',
+        status: 'disabled',
+        message: 'Alpha Vantage adapter is disabled',
+      },
     ];
 
     expect(mergeCompanyProfile(candidate, results, now)).toMatchObject({

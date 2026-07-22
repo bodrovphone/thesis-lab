@@ -114,6 +114,20 @@ const FINNHUB_PROFILE_FIXTURES: Record<string, unknown> = {
   },
 };
 
+const ALPHA_VANTAGE_OVERVIEW_FIXTURES: Record<string, unknown> = {
+  AAPL: {
+    Symbol: 'AAPL',
+    Name: 'Apple Inc',
+    Description:
+      'Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.',
+    Exchange: 'NASDAQ',
+    Country: 'USA',
+    Sector: 'TECHNOLOGY',
+    Industry: 'CONSUMER ELECTRONICS',
+    MarketCapitalization: '3000000000000',
+  },
+};
+
 function jsonResponse(body: unknown) {
   return Promise.resolve({
     ok: true,
@@ -128,6 +142,7 @@ function mockDualSourceFetch(options?: {
   finnhubSearchOk?: boolean;
   finnhubProfileOk?: boolean;
   finnhubOnlySearch?: boolean;
+  alphaVantageOverviewOk?: boolean;
 }) {
   const {
     secDirectoryOk = true,
@@ -135,6 +150,7 @@ function mockDualSourceFetch(options?: {
     finnhubSearchOk = true,
     finnhubProfileOk = true,
     finnhubOnlySearch = false,
+    alphaVantageOverviewOk = false,
   } = options ?? {};
 
   global.fetch = jest.fn((input: string | URL) => {
@@ -186,6 +202,16 @@ function mockDualSourceFetch(options?: {
       const symbolMatch = /symbol=([^&]+)/.exec(url);
       const symbol = symbolMatch ? decodeURIComponent(symbolMatch[1]) : '';
       const fixture = FINNHUB_PROFILE_FIXTURES[symbol];
+      return fixture ? jsonResponse(fixture) : jsonResponse({});
+    }
+
+    if (url.includes('alphavantage.co/query')) {
+      if (!alphaVantageOverviewOk) {
+        return jsonResponse({});
+      }
+      const symbolMatch = /symbol=([^&]+)/.exec(url);
+      const symbol = symbolMatch ? decodeURIComponent(symbolMatch[1]) : '';
+      const fixture = ALPHA_VANTAGE_OVERVIEW_FIXTURES[symbol];
       return fixture ? jsonResponse(fixture) : jsonResponse({});
     }
 
@@ -416,6 +442,44 @@ describe('Companies (e2e)', () => {
       enrichmentStatus: 'FAILED',
       lastEnrichedAt: null,
       sourcesUsed: ['SEC_EDGAR', 'FINNHUB'],
+    });
+  });
+
+  it('merges Alpha Vantage overview fields without changing search or core enrichment status', async () => {
+    mockDualSourceFetch({ alphaVantageOverviewOk: true });
+
+    const searchResponse = await request(app.getHttpServer())
+      .get('/companies/search-external')
+      .query({ q: 'apple' })
+      .expect(200);
+
+    expect(searchResponse.body.items).toEqual([
+      {
+        ticker: 'AAPL',
+        name: 'Apple Inc',
+        cik: '0000320193',
+        exchange: 'Nasdaq',
+        sources: ['SEC_EDGAR', 'FINNHUB'],
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .post('/companies')
+      .send({ ticker: 'AAPL' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      ticker: 'AAPL',
+      name: 'Apple Inc',
+      sector: 'TECHNOLOGY',
+      industry: 'CONSUMER ELECTRONICS',
+      description:
+        'Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.',
+      country: 'US',
+      website: 'https://apple.com',
+      marketCapUsd: '3000000000000',
+      enrichmentStatus: 'COMPLETE',
+      sourcesUsed: ['SEC_EDGAR', 'FINNHUB', 'ALPHA_VANTAGE'],
     });
   });
 });

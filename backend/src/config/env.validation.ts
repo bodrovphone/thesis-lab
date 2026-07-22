@@ -23,6 +23,14 @@ class EnvironmentVariables {
   FINNHUB_API_KEY?: string;
 
   @IsOptional()
+  @IsString()
+  ALPHA_VANTAGE_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  ENABLE_ALPHA_VANTAGE?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(65535)

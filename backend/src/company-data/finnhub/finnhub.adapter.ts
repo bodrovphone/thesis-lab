@@ -112,7 +112,9 @@ export function parseFinnhubProfile2Payload(
     name,
     cik: null,
     exchange: payload.exchange?.trim() || null,
+    sector: null,
     industry: payload.finnhubIndustry?.trim() || null,
+    description: null,
     country: payload.country?.trim() || null,
     marketCapUsd: convertFinnhubMarketCapUsd(
       payload.currency,

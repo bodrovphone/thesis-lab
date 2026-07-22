@@ -267,6 +267,8 @@ export class SecEdgarAdapter implements CompanyDataAdapter {
           cik: candidate.cik,
           exchange: candidate.exchange,
           industry: submissions.sicDescription ?? null,
+          sector: null,
+          description: null,
           country: null,
           marketCapUsd: null,
           website: null,

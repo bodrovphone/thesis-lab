@@ -1,4 +1,4 @@
-export type DataSourceName = 'SEC_EDGAR' | 'FINNHUB';
+export type DataSourceName = 'SEC_EDGAR' | 'FINNHUB' | 'ALPHA_VANTAGE';
 
 export interface CompanySearchCandidate {
   ticker: string;
@@ -13,7 +13,9 @@ export interface NormalizedCompanyProfile {
   name: string;
   cik: string | null;
   exchange: string | null;
+  sector: string | null;
   industry: string | null;
+  description: string | null;
   country: string | null;
   marketCapUsd: bigint | null;
   website: string | null;
