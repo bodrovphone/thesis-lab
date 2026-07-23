@@ -22,3 +22,4 @@ Standalone browser task — not part of the task pipeline (see `browser-tasks/RE
 
 ## Notes
 - This is the one credential in this folder that should use the *existing* account, not a new signup.
+- Use `GOOGLE_GENERATIVE_AI_API_KEY` exactly for both local `frontend/.env.local` and the Vercel frontend project's server-side environment variables. Do not use a `NEXT_PUBLIC_*` variable; the key must never be exposed to browser code.

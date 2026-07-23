@@ -1,4 +1,5 @@
-import { buildSummaryPrompt, capNoteHistory } from '../../../frontend/src/lib/ai/cap-note-history';
+import { describe, expect, it } from 'vitest';
+import { buildSummaryPrompt, capNoteHistory } from './cap-note-history';
 
 describe('capNoteHistory', () => {
   const notes = [

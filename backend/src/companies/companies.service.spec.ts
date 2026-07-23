@@ -11,6 +11,7 @@ function makePrisma() {
     company: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
     },
@@ -357,5 +358,62 @@ describe('CompaniesService', () => {
       orderBy: [{ updatedAt: 'desc' }, { ticker: 'asc' }],
       take: 25,
     });
+  });
+
+  it('throws NotFoundException when findOne misses', async () => {
+    const prisma = makePrisma();
+    const aggregator = makeAggregator();
+    const serializer = makeSerializer();
+    prisma.company.findUnique.mockResolvedValue(null);
+
+    const service = new CompaniesService(
+      prisma as never,
+      aggregator as never,
+      serializer,
+    );
+
+    await expect(service.findOne('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('maps P2025 on conviction update to NotFoundException', async () => {
+    const prisma = makePrisma();
+    const aggregator = makeAggregator();
+    const serializer = makeSerializer();
+    prisma.company.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record to update not found', {
+        code: 'P2025',
+        clientVersion: '7.9.0',
+      }),
+    );
+
+    const service = new CompaniesService(
+      prisma as never,
+      aggregator as never,
+      serializer,
+    );
+
+    await expect(
+      service.updateConviction('missing', 'HIGH_CONVICTION'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rethrows unexpected errors on conviction update', async () => {
+    const prisma = makePrisma();
+    const aggregator = makeAggregator();
+    const serializer = makeSerializer();
+    const unexpected = new Error('db offline');
+    prisma.company.update.mockRejectedValue(unexpected);
+
+    const service = new CompaniesService(
+      prisma as never,
+      aggregator as never,
+      serializer,
+    );
+
+    await expect(
+      service.updateConviction('c1', 'HIGH_CONVICTION'),
+    ).rejects.toBe(unexpected);
   });
 });

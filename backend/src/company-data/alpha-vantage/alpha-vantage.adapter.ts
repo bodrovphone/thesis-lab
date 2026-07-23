@@ -91,7 +91,9 @@ export function parseAlphaVantageOverviewPayload(
 
 function mapFetchOutcome(
   outcome: Exclude<
-    Awaited<ReturnType<AlphaVantageRequestSchedulerService['fetchOverview']>>['outcome'],
+    Awaited<
+      ReturnType<AlphaVantageRequestSchedulerService['fetchOverview']>
+    >['outcome'],
     'ok' | 'disabled'
   >,
 ): AdapterFailureStatus {
@@ -102,7 +104,9 @@ function mapFetchOutcome(
 export class AlphaVantageAdapter implements CompanyDataAdapter {
   readonly source = 'ALPHA_VANTAGE' as const;
 
-  constructor(private readonly scheduler: AlphaVantageRequestSchedulerService) {}
+  constructor(
+    private readonly scheduler: AlphaVantageRequestSchedulerService,
+  ) {}
 
   search(): Promise<AdapterResult<CompanySearchCandidate[]>> {
     return Promise.resolve({

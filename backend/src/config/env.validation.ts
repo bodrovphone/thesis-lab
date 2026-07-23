@@ -35,6 +35,11 @@ class EnvironmentVariables {
   @Min(1)
   @Max(65535)
   PORT?: number;
+
+  /** Comma-separated browser origins for direct API access (optional). */
+  @IsOptional()
+  @IsString()
+  CORS_ORIGIN?: string;
 }
 
 export function validateEnv(

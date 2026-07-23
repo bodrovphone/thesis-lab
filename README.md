@@ -96,13 +96,51 @@ npm run start:dev --workspace backend
 npm run dev --workspace frontend
 ```
 
+### Deployments
+
+- Frontend (Vercel): https://thesis-lab-frontend.vercel.app
+- Backend (Render): https://thesis-lab-backend-s8dj.onrender.com
+- Backend health check: https://thesis-lab-backend-s8dj.onrender.com/health
+
+For deployed frontend server-side calls, set `BACKEND_URL=https://thesis-lab-backend-s8dj.onrender.com` in Vercel and in local `frontend/.env.local` when you want the frontend to call the deployed backend.
+
+### Backend notes (auth, errors, bootstrap)
+
+- **No auth by design** — single-user research demo; API writes are open. See `backend/README.md`.
+- **Prisma → HTTP mapping** — `P2002` → 409, `P2025` → 404; unexpected DB errors are not masked as 404 (`prisma-errors.ts`).
+- **Shared Nest bootstrap** — `configureApp` applies `ValidationPipe` (+ optional `CORS_ORIGIN`) for both `main.ts` and e2e so test/prod wiring does not drift.
+
+### Frontend data & state
+
+Intentional split — no global client store (Redux/Zustand):
+
+| Concern | Approach |
+| --- | --- |
+| Remote list/detail data | React Server Components fetch via `backend-client`; mutations call `router.refresh()` to revalidate |
+| Shareable dashboard filters | URL search params (bookmarkable, no client cache needed) |
+| Ephemeral UI (forms, drafts) | Local `useState` |
+| Client islands (search, notes, enrichment, summary, conviction) | TanStack Query for request lifecycle, caching, cancellation, and optimistic note/conviction updates |
+
+TanStack Query is scoped to interactive client components only — not a second source of truth for RSC pages. Shared browser → `/api/*` calls go through `frontend/src/lib/api/client-fetch.ts`.
+
+### Product talking points
+
+- Thesis-first company workspace: conviction, research notes, moat patterns, business models, and current-thinking synthesis live together.
+- Source-aware enrichment: SEC EDGAR and Finnhub provide the core profile, with Alpha Vantage as an optional enrichment source.
+- Resilient external calls: provider requests use timeouts, pacing/budget controls, normalized outcomes, and safe structured logs.
+- Astryx Neutral UI: the dashboard uses Astryx reset/theme/card/badge/skeleton primitives alongside Tailwind for a consistent, accessible research workspace.
+- Honest states: partial or failed enrichment stays visible and can be retried without losing notes; activity surfaces the company’s research trail.
+- Frontend data layer: RSC for server-owned reads, URL for filters, TanStack Query on client islands with optimistic note mutations — no global store.
+
 ### Other commands
 
 | Command | Description |
 | --- | --- |
 | `npm run build` | Production build for both workspaces |
 | `npm run lint` | Lint backend and frontend |
-| `npm test` | Backend unit tests |
+| `npm test` | Backend + frontend unit tests |
+| `npm run test --workspace frontend` | Frontend Vitest + RTL suite |
+| `npm run test:watch --workspace frontend` | Frontend Vitest watch mode |
 | `npm run test:e2e` | Backend health endpoint e2e tests |
 | `npm run db:generate` | Regenerate Prisma Client |
 | `npm run db:migrate` | Apply Prisma migrations |

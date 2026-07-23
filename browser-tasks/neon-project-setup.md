@@ -1,6 +1,8 @@
 ---
 title: Set up Neon project for thesis-lab (existing account first, new account only if at capacity)
 created: 2026-07-23
+status: done
+completed: 2026-07-23
 ---
 
 # Set up Neon project for thesis-lab (existing account first, new account only if at capacity)
@@ -27,3 +29,10 @@ Standalone browser task — not part of the task pipeline (see `browser-tasks/RE
 ## Notes
 - No credit card required either way.
 - Both connection strings are genuinely needed, not a "pick one" — Prisma needs the direct URL for migrations, the pooled one for runtime.
+
+## Outcome
+- Used existing personal Neon free org: `Oleksandr`.
+- Created project `thesis-lab` (`sweet-silence-48677665`), branch `main` (`br-plain-wind-au0qiym7`), database `neondb`.
+- Project count after setup: `2 / 100` free-plan projects.
+- Added pooled `DATABASE_URL` and direct `DIRECT_URL` to untracked `backend/.env`.
+- Verified both connection strings with a read-only `select 1`.

@@ -2,7 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isTagSuggestBodyReady } from '@/lib/ai/tag-suggest.constants';
+import { clientFetch, getErrorMessage } from '@/lib/api/client-fetch';
+import { queryKeys } from '@/lib/query/keys';
 import {
   formatNoteTimestamp,
   labelForOption,
@@ -25,11 +28,25 @@ type NoteDraft = {
   businessModel: string;
 };
 
+type NoteWritePayload = {
+  body: string;
+  moatPattern: string | null;
+  businessModel: string | null;
+  aiAudit?: NoteAiAuditPayload;
+};
+
 const EMPTY_DRAFT: NoteDraft = {
   body: '',
   moatPattern: '',
   businessModel: '',
 };
+
+function sortNotesNewestFirst(notes: NoteView[]): NoteView[] {
+  return [...notes].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+}
 
 function TagBadge({
   label,
@@ -57,13 +74,12 @@ export function CompanyNotebook({
   businessModels,
 }: CompanyNotebookProps) {
   const router = useRouter();
-  const [notes, setNotes] = useState(initialNotes);
+  const queryClient = useQueryClient();
+  const notesKey = queryKeys.companyNotes(companyId);
+
   const [draft, setDraft] = useState<NoteDraft>(EMPTY_DRAFT);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
-  const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestMessage, setSuggestMessage] = useState<string | null>(null);
   const [suggestRationale, setSuggestRationale] = useState<string | null>(null);
   const [aiPrefilled, setAiPrefilled] = useState(false);
@@ -71,11 +87,18 @@ export function CompanyNotebook({
     null,
   );
 
+  const notesQuery = useQuery({
+    queryKey: notesKey,
+    queryFn: () => Promise.resolve(initialNotes),
+    initialData: initialNotes,
+    staleTime: Infinity,
+  });
+
   useEffect(() => {
-    // The server refresh can replace the initial notes after a mutation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNotes(initialNotes);
-  }, [initialNotes]);
+    queryClient.setQueryData(notesKey, initialNotes);
+  }, [initialNotes, notesKey, queryClient]);
+
+  const notes = notesQuery.data ?? initialNotes;
 
   const editingNote = useMemo(
     () => notes.find((note) => note.id === editingNoteId) ?? null,
@@ -108,30 +131,13 @@ export function CompanyNotebook({
     clearSuggestionState();
   }
 
-  async function handleSuggestTags() {
-    if (isSuggesting || !canSuggestTags) {
-      return;
-    }
-
-    setIsSuggesting(true);
-    setSuggestMessage(null);
-    setSuggestRationale(null);
-
-    try {
-      const response = await fetch('/api/tag-suggest', {
+  const suggestMutation = useMutation({
+    mutationFn: (noteText: string) =>
+      clientFetch<TagSuggestResponse>('/api/tag-suggest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ noteText: draft.body }),
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(body?.message ?? 'Could not suggest tags');
-      }
-
-      const suggestion = (await response.json()) as TagSuggestResponse;
+        body: JSON.stringify({ noteText }),
+      }),
+    onSuccess: (suggestion) => {
       if (isTagSuggestUnavailable(suggestion)) {
         setSuggestMessage('Suggestion unavailable — choose tags manually.');
         setAiPrefilled(false);
@@ -151,133 +157,175 @@ export function CompanyNotebook({
       setAiPrefilled(true);
       setSuggestRationale(suggestion.rationale ?? null);
       setSuggestMessage('AI suggestion applied — review before saving.');
-    } catch (suggestError) {
+    },
+    onError: (error) => {
       setSuggestMessage(
-        suggestError instanceof Error
-          ? suggestError.message
-          : 'Suggestion unavailable — choose tags manually.',
+        getErrorMessage(error, 'Suggestion unavailable — choose tags manually.'),
       );
       setAiPrefilled(false);
       setPendingAiAudit(null);
-    } finally {
-      setIsSuggesting(false);
-    }
-  }
+    },
+  });
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isSaving) {
-      return;
-    }
-
-    setIsSaving(true);
-    setFormError(null);
-
-    const payload = {
-      body: draft.body,
-      moatPattern: draft.moatPattern || null,
-      businessModel: draft.businessModel || null,
-      ...(pendingAiAudit ? { aiAudit: pendingAiAudit } : {}),
-    };
-
-    try {
-      if (editingNoteId) {
-        const response = await fetch(`/api/notes/${editingNoteId}`, {
+  const saveMutation = useMutation({
+    mutationFn: async ({
+      noteId,
+      payload,
+    }: {
+      noteId: string | null;
+      payload: NoteWritePayload;
+    }) => {
+      if (noteId) {
+        return clientFetch<NoteView>(`/api/notes/${noteId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+      }
 
-        if (!response.ok) {
-          const body = (await response.json().catch(() => null)) as {
-            message?: string;
-          } | null;
-          throw new Error(body?.message ?? 'Could not update note');
-        }
+      return clientFetch<NoteView>(`/api/companies/${companyId}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({
+          body: payload.body,
+          ...(payload.moatPattern ? { moatPattern: payload.moatPattern } : {}),
+          ...(payload.businessModel
+            ? { businessModel: payload.businessModel }
+            : {}),
+          ...(payload.aiAudit ? { aiAudit: payload.aiAudit } : {}),
+        }),
+      });
+    },
+    onMutate: async ({ noteId, payload }) => {
+      await queryClient.cancelQueries({ queryKey: notesKey });
+      const previous = queryClient.getQueryData<NoteView[]>(notesKey) ?? [];
 
-        const updated = (await response.json()) as NoteView;
-        setNotes((current) =>
-          current
-            .map((note) => (note.id === updated.id ? updated : note))
-            .sort(
-              (left, right) =>
-                new Date(right.createdAt).getTime() -
-                new Date(left.createdAt).getTime(),
+      if (noteId) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<NoteView[]>(notesKey, (current = []) =>
+          sortNotesNewestFirst(
+            current.map((note) =>
+              note.id === noteId
+                ? {
+                    ...note,
+                    body: payload.body,
+                    moatPattern: payload.moatPattern as NoteView['moatPattern'],
+                    businessModel:
+                      payload.businessModel as NoteView['businessModel'],
+                    updatedAt: now,
+                  }
+                : note,
             ),
+          ),
         );
       } else {
-        const response = await fetch(`/api/companies/${companyId}/notes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            body: payload.body,
-            ...(payload.moatPattern ? { moatPattern: payload.moatPattern } : {}),
-            ...(payload.businessModel
-              ? { businessModel: payload.businessModel }
-              : {}),
-            ...(pendingAiAudit ? { aiAudit: pendingAiAudit } : {}),
-          }),
-        });
+        const now = new Date().toISOString();
+        const optimistic: NoteView = {
+          id: `temp-${crypto.randomUUID()}`,
+          companyId,
+          body: payload.body,
+          moatPattern: payload.moatPattern as NoteView['moatPattern'],
+          businessModel: payload.businessModel as NoteView['businessModel'],
+          createdAt: now,
+          updatedAt: now,
+        };
+        queryClient.setQueryData<NoteView[]>(notesKey, (current = []) => [
+          optimistic,
+          ...current,
+        ]);
+      }
 
-        if (!response.ok) {
-          const body = (await response.json().catch(() => null)) as {
-            message?: string;
-          } | null;
-          throw new Error(body?.message ?? 'Could not create note');
+      return { previous };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(notesKey, context.previous);
+      }
+      setFormError(getErrorMessage(error, 'Could not save note'));
+    },
+    onSuccess: (saved, variables) => {
+      queryClient.setQueryData<NoteView[]>(notesKey, (current = []) => {
+        if (variables.noteId) {
+          return sortNotesNewestFirst(
+            current.map((note) => (note.id === saved.id ? saved : note)),
+          );
         }
 
-        const created = (await response.json()) as NoteView;
-        setNotes((current) => [created, ...current]);
-      }
-
+        const withoutTemps = current.filter((note) => !note.id.startsWith('temp-'));
+        const withoutDuplicate = withoutTemps.filter((note) => note.id !== saved.id);
+        return sortNotesNewestFirst([saved, ...withoutDuplicate]);
+      });
       resetForm();
       router.refresh();
-    } catch (submitError) {
-      setFormError(
-        submitError instanceof Error ? submitError.message : 'Could not save note',
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (noteId: string) =>
+      clientFetch<void>(`/api/notes/${noteId}`, { method: 'DELETE' }),
+    onMutate: async (noteId) => {
+      await queryClient.cancelQueries({ queryKey: notesKey });
+      const previous = queryClient.getQueryData<NoteView[]>(notesKey) ?? [];
+      queryClient.setQueryData<NoteView[]>(notesKey, (current = []) =>
+        current.filter((note) => note.id !== noteId),
       );
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleDelete(noteId: string) {
-    if (deletingNoteId) {
-      return;
-    }
-
-    if (!window.confirm('Delete this research note? This cannot be undone.')) {
-      return;
-    }
-
-    setDeletingNoteId(noteId);
-    setFormError(null);
-
-    try {
-      const response = await fetch(`/api/notes/${noteId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(body?.message ?? 'Could not delete note');
-      }
-
-      setNotes((current) => current.filter((note) => note.id !== noteId));
       if (editingNoteId === noteId) {
         resetForm();
       }
+      return { previous };
+    },
+    onError: (error, _noteId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(notesKey, context.previous);
+      }
+      setFormError(getErrorMessage(error, 'Could not delete note'));
+    },
+    onSuccess: () => {
       router.refresh();
-    } catch (deleteError) {
-      setFormError(
-        deleteError instanceof Error ? deleteError.message : 'Could not delete note',
-      );
-    } finally {
-      setDeletingNoteId(null);
+    },
+  });
+
+  function handleSuggestTags() {
+    if (suggestMutation.isPending || !canSuggestTags) {
+      return;
     }
+    setSuggestMessage(null);
+    setSuggestRationale(null);
+    suggestMutation.mutate(draft.body);
   }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saveMutation.isPending) {
+      return;
+    }
+
+    setFormError(null);
+    saveMutation.mutate({
+      noteId: editingNoteId,
+      payload: {
+        body: draft.body,
+        moatPattern: draft.moatPattern || null,
+        businessModel: draft.businessModel || null,
+        ...(pendingAiAudit ? { aiAudit: pendingAiAudit } : {}),
+      },
+    });
+  }
+
+  function handleDelete(noteId: string) {
+    if (deleteMutation.isPending) {
+      return;
+    }
+    if (!window.confirm('Delete this research note? This cannot be undone.')) {
+      return;
+    }
+    setFormError(null);
+    deleteMutation.mutate(noteId);
+  }
+
+  const isSuggesting = suggestMutation.isPending;
+  const isSaving = saveMutation.isPending;
+  const deletingNoteId = deleteMutation.isPending
+    ? deleteMutation.variables
+    : null;
 
   return (
     <section className="flex flex-col gap-6 border-t border-black/10 pt-6 dark:border-white/10">

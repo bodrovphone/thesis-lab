@@ -9,6 +9,7 @@ function makeService() {
     findOne: jest.fn(),
     updateConviction: jest.fn(),
     updateSummary: jest.fn(),
+    refreshEnrichment: jest.fn(),
   };
 }
 
@@ -40,21 +41,33 @@ describe('CompaniesController', () => {
 
   it('wraps the company list in an items envelope with totalTracked', async () => {
     const service = makeService();
-    service.findAll.mockResolvedValue({ items: [{ id: 'c1' }], totalTracked: 3 });
+    service.findAll.mockResolvedValue({
+      items: [{ id: 'c1' }],
+      totalTracked: 3,
+    });
     const controller = new CompaniesController(service as never);
 
-    await expect(
-      controller.findAll({ limit: 100 } as never),
-    ).resolves.toEqual({
+    await expect(controller.findAll({ limit: 100 })).resolves.toEqual({
       items: [{ id: 'c1' }],
       totalTracked: 3,
     });
     expect(service.findAll).toHaveBeenCalledWith({ limit: 100 });
   });
 
-  it('throws NotFoundException when the company does not exist', async () => {
+  it('delegates findOne to the service', async () => {
     const service = makeService();
-    service.findOne.mockResolvedValue(null);
+    service.findOne.mockResolvedValue({ id: 'c1' });
+    const controller = new CompaniesController(service as never);
+
+    await expect(controller.findOne('c1')).resolves.toEqual({ id: 'c1' });
+    expect(service.findOne).toHaveBeenCalledWith('c1');
+  });
+
+  it('propagates NotFoundException from the service', async () => {
+    const service = makeService();
+    service.findOne.mockRejectedValue(
+      new NotFoundException('Company not found'),
+    );
     const controller = new CompaniesController(service as never);
 
     await expect(controller.findOne('missing-id')).rejects.toBeInstanceOf(
@@ -62,23 +75,21 @@ describe('CompaniesController', () => {
     );
   });
 
-  it('returns the company view when found', async () => {
-    const service = makeService();
-    service.findOne.mockResolvedValue({ id: 'c1' });
-    const controller = new CompaniesController(service as never);
-
-    await expect(controller.findOne('c1')).resolves.toEqual({ id: 'c1' });
-  });
-
   it('delegates conviction updates to the service', async () => {
     const service = makeService();
-    service.updateConviction.mockResolvedValue({ id: 'c1', convictionLevel: 'HIGH_CONVICTION' });
+    service.updateConviction.mockResolvedValue({
+      id: 'c1',
+      convictionLevel: 'HIGH_CONVICTION',
+    });
     const controller = new CompaniesController(service as never);
 
     await expect(
       controller.update('c1', { convictionLevel: 'HIGH_CONVICTION' }),
     ).resolves.toEqual({ id: 'c1', convictionLevel: 'HIGH_CONVICTION' });
-    expect(service.updateConviction).toHaveBeenCalledWith('c1', 'HIGH_CONVICTION');
+    expect(service.updateConviction).toHaveBeenCalledWith(
+      'c1',
+      'HIGH_CONVICTION',
+    );
   });
 
   it('delegates summary updates to the service', async () => {

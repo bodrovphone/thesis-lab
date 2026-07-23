@@ -7,8 +7,13 @@ import type { ConvictionLevel } from '../generated/prisma/client';
 import { CompanyDataAggregatorService } from '../company-data/company-data-aggregator.service';
 import { mergeCompanyProfile } from '../company-data/merge/merge-company-profile';
 import type { CompanySearchCandidate } from '../company-data/types/company-data.types';
-import { DataSource, Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { rethrowMappedPrismaError } from '../prisma/prisma-errors';
+import {
+  toCompanyCreateData,
+  toCompanyEnrichmentUpdateData,
+} from './company-write-data';
 import { CompanySerializer } from './company.serializer';
 import type { CompanyViewDto } from './dto/company-view.dto';
 import { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
@@ -54,33 +59,15 @@ export class CompaniesService {
 
     try {
       const company = await this.prisma.company.create({
-        data: {
-          ticker: merged.ticker,
-          name: merged.name,
-          cik: merged.cik,
-          exchange: merged.exchange,
-          sector: merged.sector,
-          industry: merged.industry,
-          description: merged.description,
-          country: merged.country,
-          marketCapUsd: merged.marketCapUsd,
-          website: merged.website,
-          logoUrl: merged.logoUrl,
-          sourcesUsed: merged.sourcesUsed.map((source) => DataSource[source]),
-          enrichmentStatus: merged.enrichmentStatus,
-          lastEnrichedAt: merged.lastEnrichedAt,
-        },
+        data: toCompanyCreateData(merged),
       });
 
       return this.serializer.toView(company);
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Company is already tracked');
-      }
-      throw error;
+      rethrowMappedPrismaError(error, {
+        notFoundMessage: 'Company not found',
+        conflictMessage: 'Company is already tracked',
+      });
     }
   }
 
@@ -121,7 +108,7 @@ export class CompaniesService {
     };
   }
 
-  async findOne(id: string): Promise<CompanyViewDto | null> {
+  async findOne(id: string): Promise<CompanyViewDto> {
     const company = await this.prisma.company.findUnique({
       where: { id },
       include: {
@@ -130,9 +117,10 @@ export class CompaniesService {
         },
       },
     });
-    return company
-      ? this.serializer.toView(company, company.notes)
-      : null;
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+    return this.serializer.toView(company, company.notes);
   }
 
   async refreshEnrichment(id: string): Promise<CompanyViewDto> {
@@ -151,26 +139,19 @@ export class CompaniesService {
       await this.aggregator.fetchProfiles(candidate),
       new Date(),
     );
-    const company = await this.prisma.company.update({
-      where: { id },
-      data: {
-        name: merged.name,
-        cik: merged.cik,
-        exchange: merged.exchange,
-        sector: merged.sector,
-        industry: merged.industry,
-        description: merged.description,
-        country: merged.country,
-        marketCapUsd: merged.marketCapUsd,
-        website: merged.website,
-        logoUrl: merged.logoUrl,
-        sourcesUsed: merged.sourcesUsed.map((source) => DataSource[source]),
-        enrichmentStatus: merged.enrichmentStatus,
-        lastEnrichedAt: merged.lastEnrichedAt,
-      },
-      include: { notes: { orderBy: { createdAt: 'desc' } } },
-    });
-    return this.serializer.toView(company, company.notes);
+
+    try {
+      const company = await this.prisma.company.update({
+        where: { id },
+        data: toCompanyEnrichmentUpdateData(merged),
+        include: { notes: { orderBy: { createdAt: 'desc' } } },
+      });
+      return this.serializer.toView(company, company.notes);
+    } catch (error) {
+      rethrowMappedPrismaError(error, {
+        notFoundMessage: 'Company not found',
+      });
+    }
   }
 
   async updateConviction(
@@ -188,8 +169,10 @@ export class CompaniesService {
         },
       });
       return this.serializer.toView(company, company.notes);
-    } catch {
-      throw new NotFoundException('Company not found');
+    } catch (error) {
+      rethrowMappedPrismaError(error, {
+        notFoundMessage: 'Company not found',
+      });
     }
   }
 
@@ -211,8 +194,10 @@ export class CompaniesService {
         },
       });
       return this.serializer.toView(company, company.notes);
-    } catch {
-      throw new NotFoundException('Company not found');
+    } catch (error) {
+      rethrowMappedPrismaError(error, {
+        notFoundMessage: 'Company not found',
+      });
     }
   }
 }

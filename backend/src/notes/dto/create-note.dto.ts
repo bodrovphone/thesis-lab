@@ -4,7 +4,6 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { BusinessModel, MoatPattern } from '../../generated/prisma/client';

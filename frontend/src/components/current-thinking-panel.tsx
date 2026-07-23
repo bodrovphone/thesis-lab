@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { isSummarizeError, type SummarizeResponse } from '@/lib/ai/summarize.constants';
+import { clientFetch, getErrorMessage } from '@/lib/api/client-fetch';
 
 interface CurrentThinkingPanelProps {
   companyId: string;
@@ -31,67 +33,53 @@ export function CurrentThinkingPanel({
   const [summary, setSummary] = useState(initialSummary);
   const [generatedAt, setGeneratedAt] = useState(initialGeneratedAt);
   const [notesOmitted, setNotesOmitted] = useState<number | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleRegenerate() {
-    if (isGenerating || noteCount === 0) {
-      return;
-    }
-
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      const generateResponse = await fetch('/api/summarize', {
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      const generateBody = await clientFetch<
+        SummarizeResponse & { message?: string }
+      >('/api/summarize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId }),
       });
 
-      const generateBody = (await generateResponse.json()) as SummarizeResponse & {
-        message?: string;
-      };
-
-      if (!generateResponse.ok || isSummarizeError(generateBody)) {
-        throw new Error(
-          isSummarizeError(generateBody)
-            ? generateBody.message
-            : generateBody.message ?? 'Could not generate summary',
-        );
+      if (isSummarizeError(generateBody)) {
+        throw new Error(generateBody.message);
       }
 
-      const persistResponse = await fetch(`/api/companies/${companyId}/summary`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentThinkingSummary: generateBody.summary }),
-      });
-
-      if (!persistResponse.ok) {
-        const body = (await persistResponse.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(body?.message ?? 'Could not save summary');
-      }
-
-      const company = (await persistResponse.json()) as {
+      const company = await clientFetch<{
         currentThinkingSummary: string | null;
         summaryGeneratedAt: string | null;
-      };
+      }>(`/api/companies/${companyId}/summary`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentThinkingSummary: generateBody.summary,
+        }),
+      });
 
+      return {
+        company,
+        notesOmitted: generateBody.notesOmitted,
+      };
+    },
+    onSuccess: ({ company, notesOmitted: omitted }) => {
       setSummary(company.currentThinkingSummary);
       setGeneratedAt(company.summaryGeneratedAt);
-      setNotesOmitted(generateBody.notesOmitted);
+      setNotesOmitted(omitted);
       router.refresh();
-    } catch (regenerateError) {
-      setError(
-        regenerateError instanceof Error
-          ? regenerateError.message
-          : 'Could not regenerate summary',
-      );
-    } finally {
-      setIsGenerating(false);
+    },
+  });
+
+  const isGenerating = regenerateMutation.isPending;
+  const error = regenerateMutation.isError
+    ? getErrorMessage(regenerateMutation.error, 'Could not regenerate summary')
+    : null;
+
+  function handleRegenerate() {
+    if (isGenerating || noteCount === 0) {
+      return;
     }
+    regenerateMutation.mutate();
   }
 
   return (

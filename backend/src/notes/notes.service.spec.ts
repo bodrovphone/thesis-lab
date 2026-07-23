@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
 import { NotesService } from './notes.service';
 
 function makePrisma() {
@@ -40,7 +41,7 @@ describe('NotesService', () => {
       businessModel: null,
     });
 
-    const service = new NotesService(prisma as never, serializer as never);
+    const service = new NotesService(prisma as never, serializer);
     const result = await service.create('c1', {
       body: '  Interesting moat  ',
       moatPattern: 'NETWORK_EFFECTS',
@@ -64,7 +65,7 @@ describe('NotesService', () => {
     const prisma = makePrisma();
     const serializer = makeSerializer();
     prisma.company.findUnique.mockResolvedValue({ id: 'c1' });
-    const service = new NotesService(prisma as never, serializer as never);
+    const service = new NotesService(prisma as never, serializer);
 
     await expect(service.create('c1', { body: '   ' })).rejects.toBeInstanceOf(
       BadRequestException,
@@ -75,11 +76,11 @@ describe('NotesService', () => {
     const prisma = makePrisma();
     const serializer = makeSerializer();
     prisma.company.findUnique.mockResolvedValue(null);
-    const service = new NotesService(prisma as never, serializer as never);
+    const service = new NotesService(prisma as never, serializer);
 
-    await expect(service.create('missing', { body: 'Hello' })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.create('missing', { body: 'Hello' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('updates note body and clears optional tags', async () => {
@@ -100,7 +101,7 @@ describe('NotesService', () => {
       businessModel: null,
     });
 
-    const service = new NotesService(prisma as never, serializer as never);
+    const service = new NotesService(prisma as never, serializer);
     await service.update('n1', {
       body: ' New body ',
       moatPattern: null,
@@ -123,7 +124,7 @@ describe('NotesService', () => {
     prisma.company.findUnique.mockResolvedValue({ id: 'c1' });
     prisma.note.create.mockResolvedValue({ id: 'n1' });
 
-    const service = new NotesService(prisma as never, serializer as never);
+    const service = new NotesService(prisma as never, serializer);
     await service.create('c1', {
       body: 'Platform effects are strengthening',
       moatPattern: 'NETWORK_EFFECTS',
@@ -159,7 +160,7 @@ describe('NotesService', () => {
     });
     prisma.note.update.mockResolvedValue({ id: 'n1' });
 
-    const service = new NotesService(prisma as never, serializer as never);
+    const service = new NotesService(prisma as never, serializer);
     await service.update('n1', {
       moatPattern: 'BRAND',
       aiAudit: {
@@ -182,11 +183,26 @@ describe('NotesService', () => {
   it('throws when deleting a missing note', async () => {
     const prisma = makePrisma();
     const serializer = makeSerializer();
-    prisma.note.delete.mockRejectedValue(new Error('not found'));
-    const service = new NotesService(prisma as never, serializer as never);
+    prisma.note.delete.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record to delete not found', {
+        code: 'P2025',
+        clientVersion: '7.9.0',
+      }),
+    );
+    const service = new NotesService(prisma as never, serializer);
 
     await expect(service.remove('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('rethrows unexpected errors when deleting a note', async () => {
+    const prisma = makePrisma();
+    const serializer = makeSerializer();
+    const unexpected = new Error('db offline');
+    prisma.note.delete.mockRejectedValue(unexpected);
+    const service = new NotesService(prisma as never, serializer);
+
+    await expect(service.remove('n1')).rejects.toBe(unexpected);
   });
 });

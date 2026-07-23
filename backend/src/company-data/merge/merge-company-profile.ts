@@ -70,11 +70,7 @@ export function mergeCompanyProfile(
     (source) => source === 'ALPHA_VANTAGE',
   );
 
-  const sourcesUsed = buildSourcesUsed(
-    candidate,
-    results,
-    successfulSources,
-  );
+  const sourcesUsed = buildSourcesUsed(candidate, results, successfulSources);
 
   const enrichmentStatus =
     coreSuccesses.length >= 2

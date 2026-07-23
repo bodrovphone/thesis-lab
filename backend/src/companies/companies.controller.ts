@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -52,12 +51,8 @@ export class CompaniesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<CompanyViewDto> {
-    const company = await this.companiesService.findOne(id);
-    if (!company) {
-      throw new NotFoundException('Company not found');
-    }
-    return company;
+  findOne(@Param('id') id: string): Promise<CompanyViewDto> {
+    return this.companiesService.findOne(id);
   }
 
   @Patch(':id/summary')

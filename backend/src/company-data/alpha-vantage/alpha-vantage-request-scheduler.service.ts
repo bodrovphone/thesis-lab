@@ -9,11 +9,7 @@ const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
 const REQUEST_TIMEOUT_MS = 5000;
 
 export type AlphaVantageFetchOutcome =
-  | 'ok'
-  | 'error'
-  | 'timeout'
-  | 'rate_limited'
-  | 'disabled';
+  'ok' | 'error' | 'timeout' | 'rate_limited' | 'disabled';
 
 export interface AlphaVantageFetchResult {
   outcome: AlphaVantageFetchOutcome;
@@ -33,8 +29,7 @@ function isRateLimitPayload(json: unknown): boolean {
 
   const payload = json as Record<string, unknown>;
   return (
-    typeof payload.Note === 'string' ||
-    typeof payload.Information === 'string'
+    typeof payload.Note === 'string' || typeof payload.Information === 'string'
   );
 }
 
@@ -189,7 +184,10 @@ export class AlphaVantageRequestSchedulerService {
         this.logger.warn(
           `source=ALPHA_VANTAGE operation=overview outcome=timeout durationMs=${durationMs}`,
         );
-        return { outcome: 'timeout', message: 'Alpha Vantage request timed out' };
+        return {
+          outcome: 'timeout',
+          message: 'Alpha Vantage request timed out',
+        };
       }
 
       this.logger.warn(

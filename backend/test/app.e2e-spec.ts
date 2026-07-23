@@ -1,9 +1,10 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { FinnhubSearchCacheService } from '../src/company-data/finnhub/finnhub-search-cache.service';
+import { configureApp } from '../src/configure-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Health (e2e)', () => {
@@ -15,6 +16,7 @@ describe('Health (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureApp(app);
     await app.init();
   });
 
@@ -42,6 +44,7 @@ describe('Health (e2e)', () => {
       .compile();
 
     const unavailableApp = moduleFixture.createNestApplication();
+    configureApp(unavailableApp);
     await unavailableApp.init();
 
     await request(unavailableApp.getHttpServer()).get('/health').expect(503);
@@ -239,13 +242,7 @@ describe('Companies (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
     finnhubSearchCache = app.get(FinnhubSearchCacheService);
@@ -499,13 +496,7 @@ describe('Notes and taxonomy (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
   });
@@ -523,7 +514,9 @@ describe('Notes and taxonomy (e2e)', () => {
   });
 
   it('exposes taxonomy labels from GET /tags', async () => {
-    const response = await request(app.getHttpServer()).get('/tags').expect(200);
+    const response = await request(app.getHttpServer())
+      .get('/tags')
+      .expect(200);
 
     expect(response.body.moatPatterns).toEqual(
       expect.arrayContaining([
@@ -536,9 +529,7 @@ describe('Notes and taxonomy (e2e)', () => {
       ]),
     );
     expect(response.body.convictionLevels).toEqual(
-      expect.arrayContaining([
-        { value: 'WATCHING', label: 'Watching' },
-      ]),
+      expect.arrayContaining([{ value: 'WATCHING', label: 'Watching' }]),
     );
   });
 
@@ -684,8 +675,12 @@ describe('Notes and taxonomy (e2e)', () => {
     });
     expect(response.body.summaryGeneratedAt).toEqual(expect.any(String));
 
-    const stored = await prisma.company.findUnique({ where: { id: company.id } });
-    expect(stored?.currentThinkingSummary).toBe('Platform moat is strengthening.');
+    const stored = await prisma.company.findUnique({
+      where: { id: company.id },
+    });
+    expect(stored?.currentThinkingSummary).toBe(
+      'Platform moat is strengthening.',
+    );
     expect(stored?.summaryGeneratedAt).toBeInstanceOf(Date);
   });
 });
@@ -700,13 +695,7 @@ describe('Company list filters (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
   });

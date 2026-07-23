@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { rethrowMappedPrismaError } from '../prisma/prisma-errors';
 import { NOTE_BODY_MAX_LENGTH } from './constants';
 import type { CreateNoteDto } from './dto/create-note.dto';
 import type { NoteViewDto } from './dto/note-view.dto';
@@ -46,7 +47,11 @@ export class NotesService {
 
     const moatPattern = dto.moatPattern ?? null;
     const businessModel = dto.businessModel ?? null;
-    const aiFields = resolveNoteAiAudit(moatPattern, businessModel, dto.aiAudit);
+    const aiFields = resolveNoteAiAudit(
+      moatPattern,
+      businessModel,
+      dto.aiAudit,
+    );
 
     const note = await this.prisma.note.create({
       data: {
@@ -110,19 +115,22 @@ export class NotesService {
       );
     }
 
-    const note = await this.prisma.note.update({
-      where: { id },
-      data,
-    });
-
-    return this.serializer.toView(note);
+    try {
+      const note = await this.prisma.note.update({
+        where: { id },
+        data,
+      });
+      return this.serializer.toView(note);
+    } catch (error) {
+      rethrowMappedPrismaError(error, { notFoundMessage: 'Note not found' });
+    }
   }
 
   async remove(id: string): Promise<void> {
     try {
       await this.prisma.note.delete({ where: { id } });
-    } catch {
-      throw new NotFoundException('Note not found');
+    } catch (error) {
+      rethrowMappedPrismaError(error, { notFoundMessage: 'Note not found' });
     }
   }
 }

@@ -1,6 +1,8 @@
 ---
 title: Set up Vercel project for thesis-lab (existing account first, new account only if at capacity)
 created: 2026-07-23
+status: done
+completed: 2026-07-23
 ---
 
 # Set up Vercel project for thesis-lab (existing account first, new account only if at capacity)
@@ -28,3 +30,9 @@ The Next.js frontend deploys to Vercel. An existing Vercel account already has o
 
 ## Notes
 - Free (Hobby) tier is enough for this project; no credit card required either way.
+
+## Outcome
+- Used existing Vercel Hobby account/team: `bodrovphone's projects` (`bodrovphone@gmail.com`).
+- Created project `thesis-lab-frontend` connected to `bodrovphone/thesis-lab`.
+- Root directory set to `frontend`.
+- Production deployment is ready at https://thesis-lab-frontend.vercel.app.

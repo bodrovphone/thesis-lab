@@ -1,5 +1,4 @@
 import { NotesController } from './notes.controller';
-import { NotesService } from './notes.service';
 
 function makeService() {
   return {
@@ -16,9 +15,9 @@ describe('NotesController', () => {
     service.update.mockResolvedValue({ id: 'n1' });
     const controller = new NotesController(service as never);
 
-    await expect(
-      controller.update('n1', { body: 'Updated' }),
-    ).resolves.toEqual({ id: 'n1' });
+    await expect(controller.update('n1', { body: 'Updated' })).resolves.toEqual(
+      { id: 'n1' },
+    );
     expect(service.update).toHaveBeenCalledWith('n1', { body: 'Updated' });
   });
 

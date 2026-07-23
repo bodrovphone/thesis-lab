@@ -257,10 +257,10 @@ frontend/
   types/{company,note}.ts
 ```
 
-- **`api/tag-suggest`**: `{ noteText }` (capped ~4000 chars) → `generateObject({ model: anthropic(...), schema: z.object({ moatPattern: z.enum([...]).nullable(), businessModel: z.enum([...]).nullable(), rationale: z.string().optional() }) })`. On model failure, return `{ moatPattern: null, businessModel: null, error: 'suggestion_unavailable' }` with 200 — never blocks note-saving.
+- **`api/tag-suggest`**: `{ noteText }` (capped ~4000 chars) → `generateObject({ model: google('<flash-model-id>'), schema: z.object({ moatPattern: z.enum([...]).nullable(), businessModel: z.enum([...]).nullable(), rationale: z.string().optional() }) })`. On model failure, return `{ moatPattern: null, businessModel: null, error: 'suggestion_unavailable' }` with 200 — never blocks note-saving.
 - **`api/summarize`**: `{ companyId }` → fetch note history from the Nest backend server-side → cap by walking notes newest-to-oldest to a char budget (~12,000 chars), re-sort chronologically, prepend `[earlier notes omitted for length]` if truncated → system prompt explicitly bans invented financial figures → `streamText(...)` → stream to client; frontend calls `PATCH /companies/:id/summary` once the stream completes.
 - All backend calls are server-only (`BACKEND_URL`, not `NEXT_PUBLIC_*`) — no CORS config needed on the Nest side, a clean explicit trade-off.
-- AI provider: `@ai-sdk/anthropic` (matches this being a Claude Code build); `@ai-sdk/openai` noted as the drop-in alternative behind the same AI SDK interface if preferred later.
+- AI provider: `@ai-sdk/google` with Gemini Flash. The server-only frontend credential is `GOOGLE_GENERATIVE_AI_API_KEY`; do not use a `NEXT_PUBLIC_*` variable for it.
 
 ### Repo scaffold (once this becomes a `03-ready` build)
 ```
@@ -280,7 +280,7 @@ SEC_EDGAR_USER_AGENT="Thesis Lab Demo you@example.com"
 FINNHUB_API_KEY=""
 ALPHA_VANTAGE_API_KEY=""
 ENABLE_ALPHA_VANTAGE="true"
-ANTHROPIC_API_KEY=""
+GOOGLE_GENERATIVE_AI_API_KEY=""
 BACKEND_URL="http://localhost:3001"
 PORT=3001
 ```
@@ -299,4 +299,4 @@ PORT=3001
 **Non-cuttable**: add-by-ticker with ≥2 real parallel sources + merge/fallback, notes CRUD with both tag dimensions + conviction level, both AI features working, basic dashboard filtering.
 
 ### Deployment (separate, explicitly-approved step, not part of any current build)
-No Neon/Render/Vercel provisioning happens until explicitly requested. When ready: Neon project → pooled `DATABASE_URL` → Render web service (root `backend`, `prisma migrate deploy` in release step, free tier/cold start) → Vercel (root `frontend`, `BACKEND_URL` + `ANTHROPIC_API_KEY` env vars, no `NEXT_PUBLIC_*` needed).
+No Neon/Render/Vercel provisioning happens until explicitly requested. When ready: Neon project → pooled `DATABASE_URL` → Render web service (root `backend`, `prisma migrate deploy` in release step, free tier/cold start) → Vercel (root `frontend`, `BACKEND_URL` + `GOOGLE_GENERATIVE_AI_API_KEY` env vars, no `NEXT_PUBLIC_*` needed).
