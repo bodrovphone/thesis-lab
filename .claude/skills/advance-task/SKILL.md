@@ -1,6 +1,6 @@
 ---
 name: advance-task
-description: Advance a named task through this repository's ideas-to-specs or specs-to-ready transition. Use when the user asks to advance, promote, elevate, or sign off on a task in 01-ideas/ or 02-specs/.
+description: Advance a named task through this repository's ideas-to-specs or specs-to-ready transition. Use when the user asks to advance, promote, elevate, or sign off on a task in docs/task-pipeline/01-ideas/ or docs/task-pipeline/02-specs/.
 ---
 
 # Advance a task

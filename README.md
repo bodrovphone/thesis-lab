@@ -187,17 +187,17 @@ The application lives in an npm-workspaces monorepo:
 | `backend/` | NestJS domain API, Prisma persistence, and company-data adapters |
 | `backend/prisma/` | Schema and migrations |
 | `docs/architecture/` | Editable system-design artifacts |
-| `01-ideas/` → `04-shipped/` | Agent-assisted engineering task pipeline |
-| `browser-tasks/` | Standalone external setup tasks |
+| `docs/task-pipeline/01-ideas/` → `docs/task-pipeline/04-shipped/` | Agent-assisted engineering task pipeline |
+| `docs/browser-tasks/` | Standalone external setup tasks |
 
 ### Task pipeline
 
 | Folder | Purpose |
 | --- | --- |
-| `01-ideas/` | Raw ideas, research notes, and rough plans |
-| `02-specs/` | Technical approaches, trade-offs, action items, and open questions |
-| `03-ready/` | Fully actionable implementation tasks with verification plans |
-| `04-shipped/` | Completed work with outcomes and links |
+| `docs/task-pipeline/01-ideas/` | Raw ideas, research notes, and rough plans |
+| `docs/task-pipeline/02-specs/` | Technical approaches, trade-offs, action items, and open questions |
+| `docs/task-pipeline/03-ready/` | Fully actionable implementation tasks with verification plans |
+| `docs/task-pipeline/04-shipped/` | Completed work with outcomes and links |
 
 The authoritative workflow, frontmatter convention, and two-model sign-off gate live in [`AGENTS.md`](AGENTS.md). Moving a task from ideas to specs or from specs to ready requires approvals from two genuinely different models. The first model elevates and signs the content; the second independently reviews it, improves it if needed, and moves the file.
 

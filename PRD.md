@@ -466,7 +466,7 @@ Collaboration, portfolio tracking, brokerage integrations, real-time alerts, aut
 
 - [Architecture and engineering overview](README.md)
 - [Editable system architecture diagram](docs/architecture/thesis-lab-system-architecture.excalidraw)
-- [Cross-model technical reference](02-specs/mini-research-tracker-idea.md)
-- [Shipped task outcomes](04-shipped/README.md)
+- [Cross-model technical reference](docs/task-pipeline/02-specs/mini-research-tracker-idea.md)
+- [Shipped task outcomes](docs/task-pipeline/04-shipped/README.md)
 - [Engineering task pipeline](AGENTS.md)
 - [PRD design record](docs/plans/2026-07-23-product-requirements-document-design.md)
