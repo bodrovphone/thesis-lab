@@ -67,6 +67,20 @@ function normalizeAllowedValue<T extends string>(
     return 'INSURERS_AND_FINANCIALS' as T;
   }
 
+  if (
+    allowed.includes('MARKETPLACES_AND_PLATFORMS' as T) &&
+    [
+      'transaction based',
+      'transactional',
+      'payment network',
+      'payments network',
+      'card network',
+      'payment processor',
+    ].includes(canonical)
+  ) {
+    return 'MARKETPLACES_AND_PLATFORMS' as T;
+  }
+
   return null;
 }
 
