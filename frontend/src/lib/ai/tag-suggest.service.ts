@@ -15,9 +15,9 @@ import {
 // before the model is called. We normalize these strings into allowed enums
 // after the response is received.
 const tagSuggestionSchema = z.object({
-  moatPattern: z.string(),
-  businessModel: z.string(),
-  rationale: z.string().max(240),
+  moatPattern: z.string().nullable().default(''),
+  businessModel: z.string().nullable().default(''),
+  rationale: z.string().max(240).nullable().default(''),
 });
 
 function parseTagSuggestion(text: string): z.infer<typeof tagSuggestionSchema> {
@@ -31,10 +31,10 @@ function parseTagSuggestion(text: string): z.infer<typeof tagSuggestionSchema> {
 }
 
 function normalizeAllowedValue<T extends string>(
-  value: string,
+  value: string | null,
   allowed: readonly T[],
 ): T | null {
-  const normalized = value.trim().toUpperCase();
+  const normalized = value?.trim().toUpperCase() ?? '';
   return allowed.includes(normalized as T) ? (normalized as T) : null;
 }
 
@@ -85,12 +85,18 @@ export async function suggestTagsFromNoteText(
     return {
       moatPattern,
       businessModel,
-      ...(output.rationale.trim() ? { rationale: output.rationale.trim() } : {}),
+      ...(output.rationale?.trim()
+        ? { rationale: output.rationale.trim() }
+        : {}),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
     const category =
-      message.includes('429') || message.includes('quota')
+      error instanceof z.ZodError
+        ? 'response_validation'
+        : message.includes('json object') || message.includes('json')
+          ? 'response_parse'
+          : message.includes('429') || message.includes('quota')
         ? 'rate_limited'
         : message.includes('timeout') || message.includes('aborted')
           ? 'timeout'
