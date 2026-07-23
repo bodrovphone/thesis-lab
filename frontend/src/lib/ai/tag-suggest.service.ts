@@ -13,7 +13,10 @@ import {
 const tagSuggestionSchema = z.object({
   moatPattern: z.enum(MOAT_PATTERN_VALUES).nullable(),
   businessModel: z.enum(BUSINESS_MODEL_VALUES).nullable(),
-  rationale: z.string().max(240).nullable().optional(),
+  // Gemini structured output is more reliable when every property is required.
+  // A nullable field still lets the model omit a rationale semantically without
+  // generating an optional/union schema that the provider may reject.
+  rationale: z.string().max(240).nullable(),
 });
 
 const SYSTEM_PROMPT = `You classify research notes for an investment notebook.
@@ -57,7 +60,19 @@ export async function suggestTagsFromNoteText(
       businessModel: output.businessModel,
       ...(output.rationale ? { rationale: output.rationale } : {}),
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    const category =
+      message.includes('429') || message.includes('quota')
+        ? 'rate_limited'
+        : message.includes('timeout') || message.includes('aborted')
+          ? 'timeout'
+          : message.includes('schema') || message.includes('object')
+            ? 'structured_output'
+            : 'provider_error';
+
+    // Do not log the API key, note text, prompt, or generated content.
+    console.error('[tag-suggest] Gemini request failed', { category });
     return unavailableTagSuggestResponse();
   }
 }
