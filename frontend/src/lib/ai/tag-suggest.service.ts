@@ -1,6 +1,5 @@
 import { generateText } from 'ai';
 import { google } from '@ai-sdk/google';
-import { z } from 'zod';
 import {
   BUSINESS_MODEL_VALUES,
   GEMINI_FLASH_MODEL_ID,
@@ -10,24 +9,32 @@ import {
   unavailableTagSuggestResponse,
 } from './tag-suggest.constants';
 
-// Keep the provider-facing schema deliberately simple. Gemini's structured
-// output support is stricter than Zod: nullable enum unions can be rejected
-// before the model is called. We normalize these strings into allowed enums
-// after the response is received.
-const tagSuggestionSchema = z.object({
-  moatPattern: z.string().nullable().default(''),
-  businessModel: z.string().nullable().default(''),
-  rationale: z.string().max(240).nullable().default(''),
-});
+type ParsedTagSuggestion = {
+  moatPattern: string;
+  businessModel: string;
+  rationale: string;
+};
 
-function parseTagSuggestion(text: string): z.infer<typeof tagSuggestionSchema> {
+function parseTagSuggestion(text: string): ParsedTagSuggestion {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) {
     throw new Error('Tag suggestion did not contain a JSON object');
   }
 
-  return tagSuggestionSchema.parse(JSON.parse(text.slice(start, end + 1)));
+  const parsed: unknown = JSON.parse(text.slice(start, end + 1));
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('Tag suggestion JSON was not an object');
+  }
+
+  const value = parsed as Record<string, unknown>;
+  return {
+    moatPattern:
+      typeof value.moatPattern === 'string' ? value.moatPattern : '',
+    businessModel:
+      typeof value.businessModel === 'string' ? value.businessModel : '',
+    rationale: typeof value.rationale === 'string' ? value.rationale : '',
+  };
 }
 
 function normalizeAllowedValue<T extends string>(
@@ -92,17 +99,15 @@ export async function suggestTagsFromNoteText(
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
     const category =
-      error instanceof z.ZodError
-        ? 'response_validation'
-        : message.includes('json object') || message.includes('json')
-          ? 'response_parse'
-          : message.includes('429') || message.includes('quota')
-        ? 'rate_limited'
-        : message.includes('timeout') || message.includes('aborted')
-          ? 'timeout'
-          : message.includes('schema') || message.includes('object')
-            ? 'structured_output'
-            : 'provider_error';
+      message.includes('json object') || message.includes('json')
+        ? 'response_parse'
+        : message.includes('429') || message.includes('quota')
+          ? 'rate_limited'
+          : message.includes('timeout') || message.includes('aborted')
+            ? 'timeout'
+            : message.includes('schema') || message.includes('object')
+              ? 'structured_output'
+              : 'provider_error';
 
     // Do not log the API key, note text, prompt, or generated content.
     console.error('[tag-suggest] Gemini request failed', { category });
