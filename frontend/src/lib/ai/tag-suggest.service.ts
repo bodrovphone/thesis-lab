@@ -10,18 +10,28 @@ import {
   unavailableTagSuggestResponse,
 } from './tag-suggest.constants';
 
+// Keep the provider-facing schema deliberately simple. Gemini's structured
+// output support is stricter than Zod: nullable enum unions can be rejected
+// before the model is called. We normalize these strings into allowed enums
+// after the response is received.
 const tagSuggestionSchema = z.object({
-  moatPattern: z.enum(MOAT_PATTERN_VALUES).nullable(),
-  businessModel: z.enum(BUSINESS_MODEL_VALUES).nullable(),
-  // Gemini structured output is more reliable when every property is required.
-  // A nullable field still lets the model omit a rationale semantically without
-  // generating an optional/union schema that the provider may reject.
-  rationale: z.string().max(240).nullable(),
+  moatPattern: z.string(),
+  businessModel: z.string(),
+  rationale: z.string().max(240),
 });
+
+function normalizeAllowedValue<T extends string>(
+  value: string,
+  allowed: readonly T[],
+): T | null {
+  const normalized = value.trim().toUpperCase();
+  return allowed.includes(normalized as T) ? (normalized as T) : null;
+}
 
 const SYSTEM_PROMPT = `You classify research notes for an investment notebook.
 Return at most one moat pattern and one business model from the allowed enums.
-Use null for a dimension when the note text does not support a confident classification.
+Use an empty string for a dimension when the note text does not support a confident classification.
+Use an empty string when no rationale is useful.
 Do not invent company facts, financial figures, prices, or investment recommendations.
 Classify only from the supplied note text.`;
 
@@ -63,10 +73,19 @@ export async function suggestTagsFromNoteText(
     });
 
     const output = result.output;
+    const moatPattern = normalizeAllowedValue(
+      output.moatPattern,
+      MOAT_PATTERN_VALUES,
+    );
+    const businessModel = normalizeAllowedValue(
+      output.businessModel,
+      BUSINESS_MODEL_VALUES,
+    );
+
     return {
-      moatPattern: output.moatPattern,
-      businessModel: output.businessModel,
-      ...(output.rationale ? { rationale: output.rationale } : {}),
+      moatPattern,
+      businessModel,
+      ...(output.rationale.trim() ? { rationale: output.rationale.trim() } : {}),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
