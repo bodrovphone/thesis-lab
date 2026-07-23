@@ -1,4 +1,4 @@
-import { generateText, Output } from 'ai';
+import { generateText } from 'ai';
 import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import {
@@ -20,6 +20,16 @@ const tagSuggestionSchema = z.object({
   rationale: z.string().max(240),
 });
 
+function parseTagSuggestion(text: string): z.infer<typeof tagSuggestionSchema> {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error('Tag suggestion did not contain a JSON object');
+  }
+
+  return tagSuggestionSchema.parse(JSON.parse(text.slice(start, end + 1)));
+}
+
 function normalizeAllowedValue<T extends string>(
   value: string,
   allowed: readonly T[],
@@ -32,6 +42,7 @@ const SYSTEM_PROMPT = `You classify research notes for an investment notebook.
 Return at most one moat pattern and one business model from the allowed enums.
 Use an empty string for a dimension when the note text does not support a confident classification.
 Use an empty string when no rationale is useful.
+Return only a JSON object with exactly these string fields: moatPattern, businessModel, rationale.
 Do not invent company facts, financial figures, prices, or investment recommendations.
 Classify only from the supplied note text.`;
 
@@ -58,21 +69,10 @@ export async function suggestTagsFromNoteText(
       model: google(dependencies.modelId ?? GEMINI_FLASH_MODEL_ID),
       system: SYSTEM_PROMPT,
       prompt: noteText,
-      // Gemini's native structured-output mode rejects this schema in the
-      // current provider version. The AI SDK still parses and validates the
-      // object against tagSuggestionSchema when native mode is disabled.
-      providerOptions: {
-        google: {
-          structuredOutputs: false,
-        },
-      },
-      output: Output.object({
-        schema: tagSuggestionSchema,
-      }),
       abortSignal: AbortSignal.timeout(TAG_SUGGEST_TIMEOUT_MS),
     });
 
-    const output = result.output;
+    const output = parseTagSuggestion(result.text);
     const moatPattern = normalizeAllowedValue(
       output.moatPattern,
       MOAT_PATTERN_VALUES,
