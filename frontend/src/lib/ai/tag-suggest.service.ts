@@ -48,6 +48,14 @@ export async function suggestTagsFromNoteText(
       model: google(dependencies.modelId ?? GEMINI_FLASH_MODEL_ID),
       system: SYSTEM_PROMPT,
       prompt: noteText,
+      // Gemini's native structured-output mode rejects this schema in the
+      // current provider version. The AI SDK still parses and validates the
+      // object against tagSuggestionSchema when native mode is disabled.
+      providerOptions: {
+        google: {
+          structuredOutputs: false,
+        },
+      },
       output: Output.object({
         schema: tagSuggestionSchema,
       }),
