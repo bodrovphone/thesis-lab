@@ -1,6 +1,8 @@
 export const NOTE_BODY_MAX_LENGTH = 4000;
 export const TAG_SUGGEST_MIN_BODY_LENGTH = 20;
-export const TAG_SUGGEST_TIMEOUT_MS = 10_000;
+// Gemini can take longer than ten seconds on a cold or busy request. Keep the
+// tag call bounded, but use the same practical ceiling as note summaries.
+export const TAG_SUGGEST_TIMEOUT_MS = 30_000;
 export const GEMINI_FLASH_MODEL_ID = 'gemini-2.5-flash';
 
 export const MOAT_PATTERN_VALUES = [
