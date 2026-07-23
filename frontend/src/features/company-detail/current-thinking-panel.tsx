@@ -5,22 +5,13 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { isSummarizeError, type SummarizeResponse } from '@/lib/ai/summarize.constants';
 import { clientFetch, getErrorMessage } from '@/lib/api/client-fetch';
+import { formatGeneratedAt } from '@/lib/format/datetime';
 
 interface CurrentThinkingPanelProps {
   companyId: string;
   noteCount: number;
   initialSummary: string | null;
   initialGeneratedAt: string | null;
-}
-
-function formatGeneratedAt(value: string): string {
-  return new Date(value).toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }
 
 export function CurrentThinkingPanel({

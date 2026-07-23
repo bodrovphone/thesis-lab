@@ -1,14 +1,6 @@
+import { relativeTime } from '@/lib/format/datetime';
 import type { CompanyView } from '@/types/company';
-import { formatNoteTimestamp, type NoteView } from '@/types/note';
-
-function relativeTime(value: string): string {
-  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.round(seconds / 86400)}d ago`;
-  return formatNoteTimestamp(value);
-}
+import type { NoteView } from '@/types/note';
 
 export function ActivityFeed({ company }: { company: CompanyView }) {
   const notes = company.notes ?? [];
