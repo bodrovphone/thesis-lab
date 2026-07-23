@@ -2,7 +2,7 @@
 
 > A thesis-first investment research workspace that turns fragmented company data and research notes into a durable, explainable conviction record.
 
-[Live application](https://thesis-lab-frontend.vercel.app) · [Backend health](https://thesis-lab-backend-s8dj.onrender.com/health) · [Editable architecture diagram](docs/architecture/thesis-lab-system-architecture.excalidraw)
+[Live application](https://thesis-lab-frontend.vercel.app) · [Product requirements](PRD.md) · [Backend health](https://thesis-lab-backend-s8dj.onrender.com/health) · [Editable architecture diagram](docs/architecture/thesis-lab-system-architecture.excalidraw)
 
 ## Executive overview
 
