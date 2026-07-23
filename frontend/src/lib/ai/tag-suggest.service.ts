@@ -41,8 +41,33 @@ function normalizeAllowedValue<T extends string>(
   value: string | null,
   allowed: readonly T[],
 ): T | null {
-  const normalized = value?.trim().toUpperCase() ?? '';
-  return allowed.includes(normalized as T) ? (normalized as T) : null;
+  const normalized = value?.trim() ?? '';
+  const canonical = normalized
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  const directMatch = allowed.find(
+    (candidate) =>
+      candidate.toLowerCase().replace(/_/g, ' ') === canonical,
+  );
+  if (directMatch) {
+    return directMatch;
+  }
+
+  // Gemini may use a natural-language category that is not part of the
+  // product taxonomy. Map the closest supported business-model category.
+  if (
+    allowed.includes('INSURERS_AND_FINANCIALS' as T) &&
+    ['fintech', 'fintech company', 'financial services', 'payments company'].includes(
+      canonical,
+    )
+  ) {
+    return 'INSURERS_AND_FINANCIALS' as T;
+  }
+
+  return null;
 }
 
 const SYSTEM_PROMPT = `You classify research notes for an investment notebook.
