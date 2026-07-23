@@ -105,6 +105,12 @@ export async function suggestTagsFromNoteText(
     });
 
     const output = parseTagSuggestion(result.text);
+    // Safe diagnostic: record only the model's classification fields, never
+    // the note text, prompt, rationale, or credentials.
+    console.info('[tag-suggest] Gemini response fields', {
+      moatPattern: output.moatPattern,
+      businessModel: output.businessModel,
+    });
     const moatPattern = normalizeAllowedValue(
       output.moatPattern,
       MOAT_PATTERN_VALUES,
